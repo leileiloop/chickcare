@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, request, session, flash, url_for, redirect
 import os
-import psycopg  # psycopg3, compatible with Python 3.13
+import psycopg  # psycopg3
 import requests
 
 # -------------------------
@@ -17,7 +17,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def get_db_connection():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
-    conn = psycopg.connect(DATABASE_URL, autocommit=True, sslmode='require')
+    # Append sslmode=require if not already in URL
+    url = DATABASE_URL
+    if "sslmode" not in DATABASE_URL:
+        url += "?sslmode=require"
+    conn = psycopg.connect(url, autocommit=True)
     return conn
 
 def get_db_cursor(conn):
@@ -36,7 +40,6 @@ def init_db():
         conn = get_db_connection()
         cur = get_db_cursor(conn)
 
-        # Users table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -46,7 +49,6 @@ def init_db():
             )
         """)
 
-        # Sensor tables
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sensordata (
                 id SERIAL PRIMARY KEY,
@@ -59,6 +61,7 @@ def init_db():
                 ExhaustFan TEXT
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sensordata1 (
                 id SERIAL PRIMARY KEY,
@@ -67,6 +70,7 @@ def init_db():
                 Water TEXT
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sensordata2 (
                 id SERIAL PRIMARY KEY,
@@ -76,6 +80,7 @@ def init_db():
                 UVLight TEXT
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sensordata3 (
                 id SERIAL PRIMARY KEY,
@@ -86,6 +91,7 @@ def init_db():
                 AverageWeight REAL
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sensordata4 (
                 id SERIAL PRIMARY KEY,
@@ -94,6 +100,7 @@ def init_db():
                 Food_Level REAL
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
@@ -101,6 +108,7 @@ def init_db():
                 message TEXT
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS chickstatus (
                 id SERIAL PRIMARY KEY,
@@ -109,6 +117,7 @@ def init_db():
                 status TEXT
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS chick_records (
                 id SERIAL PRIMARY KEY,
@@ -144,7 +153,6 @@ def run_github_sql():
         response.raise_for_status()
         sql_text = response.text
 
-        # Execute each command separately
         for command in sql_text.split(";"):
             cmd = command.strip()
             if cmd:
@@ -161,7 +169,7 @@ def run_github_sql():
         if cur: cur.close()
         if conn: conn.close()
 
-# Initialize DB and load test.sql
+# Initialize DB and run SQL
 init_db()
 run_github_sql()
 
@@ -179,7 +187,6 @@ def login():
         if not username or not password:
             error = "Please provide username and password."
         else:
-            # Static admin login
             if username.lower() == "admin" and password == "admin":
                 session["user_role"] = "admin"
                 session["email"] = "admin@domain.com"
@@ -204,6 +211,7 @@ def login():
                 return redirect(url_for("dashboard"))
             else:
                 error = error or "Invalid credentials."
+
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -221,7 +229,10 @@ def register():
         try:
             conn = get_db_connection()
             cur = get_db_cursor(conn)
-            cur.execute("INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)", (email, username, password))
+            cur.execute(
+                "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
+                (email, username, password)
+            )
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
         except psycopg.errors.UniqueViolation:
@@ -246,10 +257,9 @@ def logout():
 def list_shots():
     shots_folder = os.path.join(app.static_folder, "shots")
     try:
-        files = [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
+        return [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
     except Exception:
-        files = []
-    return files
+        return []
 
 @app.route("/dashboard")
 def dashboard():
@@ -264,6 +274,7 @@ def dashboard():
         cur = get_db_cursor(conn)
         cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
         notifications = [dict(row) for row in cur.fetchall()]
+
         cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
         latest_sensor = cur.fetchone()
     except Exception as e:
