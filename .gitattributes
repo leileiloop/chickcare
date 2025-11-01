@@ -1,0 +1,2 @@
+test.sql filter=lfs diff=lfs merge=lfs -text
+test.json filter=lfs diff=lfs merge=lfs -text
