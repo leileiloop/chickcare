@@ -17,7 +17,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environme
 def get_db_connection():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
-    conn = psycopg2.connect(DATABASE_URL)
+    # Render Postgres requires SSL
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     conn.autocommit = True
     return conn
 
@@ -32,106 +33,100 @@ def init_db():
         print("Skipping DB initialization: DATABASE_URL not set.")
         return
 
-    conn = get_db_connection()
-    cur = get_db_cursor(conn)
+    try:
+        conn = get_db_connection()
+        cur = get_db_cursor(conn)
 
-    # Users table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            Email TEXT,
-            Username TEXT UNIQUE,
-            Password TEXT
-        )
-    """)
+        # Users table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                Email TEXT,
+                Username TEXT UNIQUE,
+                Password TEXT
+            )
+        """)
 
-    # Sensor tables
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensordata (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            Humidity REAL,
-            Temperature REAL,
-            Light1 TEXT,
-            Light2 TEXT,
-            Ammonia REAL,
-            ExhaustFan TEXT
-        )
-    """)
+        # Sensor tables
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sensordata (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                Humidity REAL,
+                Temperature REAL,
+                Light1 TEXT,
+                Light2 TEXT,
+                Ammonia REAL,
+                ExhaustFan TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sensordata1 (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                Food TEXT,
+                Water TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sensordata2 (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                Conveyor TEXT,
+                Sprinkle TEXT,
+                UVLight TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sensordata3 (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                ChickNumber TEXT,
+                Weight REAL,
+                WeighingCount INTEGER,
+                AverageWeight REAL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sensordata4 (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                Water_Level REAL,
+                Food_Level REAL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                message TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chickstatus (
+                id SERIAL PRIMARY KEY,
+                DateTime TIMESTAMP DEFAULT NOW(),
+                ChickNumber TEXT,
+                status TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chick_records (
+                id SERIAL PRIMARY KEY,
+                ChickNumber TEXT UNIQUE,
+                registration_date TIMESTAMP DEFAULT NOW()
+            )
+        """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensordata1 (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            Food TEXT,
-            Water TEXT
-        )
-    """)
+        cur.close()
+        conn.close()
+        print("Database initialized successfully.")
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensordata2 (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            Conveyor TEXT,
-            Sprinkle TEXT,
-            UVLight TEXT
-        )
-    """)
+    except Exception as e:
+        print(f"DB initialization failed: {e}")
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensordata3 (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            ChickNumber TEXT,
-            Weight REAL,
-            WeighingCount INTEGER,
-            AverageWeight REAL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensordata4 (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            Water_Level REAL,
-            Food_Level REAL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS notifications (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            message TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chickstatus (
-            id SERIAL PRIMARY KEY,
-            DateTime TIMESTAMP DEFAULT NOW(),
-            ChickNumber TEXT,
-            status TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chick_records (
-            id SERIAL PRIMARY KEY,
-            ChickNumber TEXT UNIQUE,
-            registration_date TIMESTAMP DEFAULT NOW()
-        )
-    """)
-
-    cur.close()
-    conn.close()
-    print("Database initialized successfully.")
-
-# Only initialize DB if running locally or DATABASE_URL is set
-try:
-    init_db()
-except Exception as e:
-    print(f"DB initialization failed: {e}")
+# Initialize DB safely
+init_db()
 
 # -------------------------
 # Authentication Routes
@@ -157,16 +152,19 @@ def login():
                 cur = get_db_cursor(conn)
                 cur.execute("SELECT * FROM users WHERE Username=%s AND Password=%s", (username, password))
                 user = cur.fetchone()
+            except Exception as e:
+                error = f"DB error: {e}"
+                user = None
             finally:
-                cur.close()
-                conn.close()
+                if cur: cur.close()
+                if conn: conn.close()
 
             if user:
                 session["user_role"] = "user"
                 session["email"] = user["Email"]
                 return redirect(url_for("dashboard"))
             else:
-                error = "Invalid credentials."
+                error = error or "Invalid credentials."
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -188,9 +186,11 @@ def register():
             return redirect(url_for("login"))
         except psycopg2.errors.UniqueViolation:
             flash("Username already taken.", "danger")
+        except Exception as e:
+            flash(f"DB Error: {e}", "danger")
         finally:
-            cur.close()
-            conn.close()
+            if cur: cur.close()
+            if conn: conn.close()
 
     return render_template("register.html")
 
@@ -215,6 +215,9 @@ def list_shots():
 def dashboard():
     if "user_role" not in session:
         return redirect(url_for("login"))
+
+    notifications = []
+    latest_sensor = None
     try:
         conn = get_db_connection()
         cur = get_db_cursor(conn)
@@ -222,9 +225,11 @@ def dashboard():
         notifications = [dict(row) for row in cur.fetchall()]
         cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
         latest_sensor = cur.fetchone()
+    except Exception as e:
+        print(f"Dashboard DB error: {e}")
     finally:
-        cur.close()
-        conn.close()
+        if cur: cur.close()
+        if conn: conn.close()
 
     return render_template(
         "dashboard.html",
@@ -233,6 +238,9 @@ def dashboard():
         data=dict(latest_sensor) if latest_sensor else None
     )
 
+# -------------------------
+# Health Check
+# -------------------------
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
