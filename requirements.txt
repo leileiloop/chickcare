@@ -2,3 +2,4 @@ Flask==3.0.3
 psycopg[binary]==3.2.12
 requests==2.31.0
 gunicorn==21.2.0
+firebase-admin==7.6.0
