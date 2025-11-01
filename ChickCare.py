@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request, session, flash, url_
 import os
 import psycopg2
 import psycopg2.extras
+import requests
 
 # -------------------------
 # App Config
@@ -17,7 +18,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environme
 def get_db_connection():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
-    # Render Postgres requires SSL
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     conn.autocommit = True
     return conn
@@ -26,13 +26,14 @@ def get_db_cursor(conn):
     return conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 # -------------------------
-# Initialize DB (if DB exists)
+# Initialize DB
 # -------------------------
 def init_db():
     if not DATABASE_URL:
         print("Skipping DB initialization: DATABASE_URL not set.")
         return
 
+    conn = cur = None
     try:
         conn = get_db_connection()
         cur = get_db_cursor(conn)
@@ -118,15 +119,56 @@ def init_db():
             )
         """)
 
-        cur.close()
-        conn.close()
         print("Database initialized successfully.")
 
     except Exception as e:
         print(f"DB initialization failed: {e}")
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
 
-# Initialize DB safely
+# -------------------------
+# Run SQL from GitHub
+# -------------------------
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/<username>/<repo>/main/test.sql"  # replace <username>/<repo>
+
+def run_github_sql():
+    if not DATABASE_URL:
+        print("DATABASE_URL not set, skipping SQL import.")
+        return
+
+    conn = cur = None
+    try:
+        conn = get_db_connection()
+        cur = get_db_cursor(conn)
+
+        response = requests.get(GITHUB_RAW_URL)
+        response.raise_for_status()
+        sql_text = response.text
+
+        # Split commands by semicolon
+        commands = sql_text.split(";")
+        for command in commands:
+            cmd = command.strip()
+            if cmd:
+                try:
+                    cur.execute(cmd)
+                except Exception as e:
+                    print("Skipping command error:", e)
+
+        print("SQL from GitHub executed successfully!")
+
+    except Exception as e:
+        print("Error running GitHub SQL:", e)
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+# -------------------------
+# Initialize DB and load test.sql
+# -------------------------
 init_db()
+run_github_sql()
 
 # -------------------------
 # Authentication Routes
@@ -147,6 +189,7 @@ def login():
                 session["email"] = "admin@domain.com"
                 return redirect(url_for("dashboard"))
 
+            conn = cur = None
             try:
                 conn = get_db_connection()
                 cur = get_db_cursor(conn)
@@ -178,6 +221,7 @@ def register():
             flash("Please fill all fields.", "warning")
             return redirect(url_for("register"))
 
+        conn = cur = None
         try:
             conn = get_db_connection()
             cur = get_db_cursor(conn)
@@ -201,7 +245,7 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
-# Dashboard Routes
+# Dashboard Route
 # -------------------------
 def list_shots():
     shots_folder = os.path.join(app.static_folder, "shots")
@@ -218,6 +262,7 @@ def dashboard():
 
     notifications = []
     latest_sensor = None
+    conn = cur = None
     try:
         conn = get_db_connection()
         cur = get_db_cursor(conn)
@@ -237,6 +282,29 @@ def dashboard():
         notifications=notifications,
         data=dict(latest_sensor) if latest_sensor else None
     )
+
+# -------------------------
+# Display SQL Data (from test.sql)
+# -------------------------
+@app.route("/chicks")
+def chicks():
+    if "user_role" not in session:
+        return redirect(url_for("login"))
+
+    data = []
+    conn = cur = None
+    try:
+        conn = get_db_connection()
+        cur = get_db_cursor(conn)
+        cur.execute("SELECT * FROM chick_records ORDER BY registration_date DESC")
+        data = [dict(row) for row in cur.fetchall()]
+    except Exception as e:
+        print("Error fetching chicks:", e)
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+    return render_template("chicks.html", chicks=data)
 
 # -------------------------
 # Health Check
