@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Feed Test</title>
+</head>
+<body>
+    <h1>Live Camera Feed</h1>
+    <img src="/video_feed" width="720" />
+</body>
+</html>
