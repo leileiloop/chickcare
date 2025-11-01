@@ -13,7 +13,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 # -------------------------
 # Firebase Config
 # -------------------------
-# Use service account JSON stored in environment variable
 FIREBASE_CREDENTIALS = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 
 if not FIREBASE_CREDENTIALS:
@@ -52,10 +51,14 @@ def get_latest_sensor():
     return all_data[latest_key]
 
 def get_notifications(limit=10):
-    notif_ref = db.reference("notifications")
-    all_notif = notif_ref.order_by_child("DateTime").get() or {}
-    sorted_keys = sorted(all_notif, key=lambda k: all_notif[k]["DateTime"], reverse=True)
-    return [all_notif[k] for k in sorted_keys[:limit]]
+    try:
+        notif_ref = db.reference("notifications")
+        all_notif = notif_ref.order_by_child("DateTime").get() or {}
+        sorted_keys = sorted(all_notif, key=lambda k: all_notif[k]["DateTime"], reverse=True)
+        return [all_notif[k] for k in sorted_keys[:limit]]
+    except Exception as e:
+        print(f"Error fetching notifications: {e}")
+        return []
 
 # -------------------------
 # Auth Routes
@@ -117,7 +120,7 @@ def logout():
 def list_shots():
     shots_folder = os.path.join(app.static_folder, "shots")
     try:
-        return [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg",".jpeg",".png",".gif"))]
+        return [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
     except Exception:
         return []
 
@@ -135,6 +138,18 @@ def dashboard():
         notifications=notifications,
         data=latest_sensor
     )
+
+# -------------------------
+# Data Endpoint (for dashboard AJAX)
+# -------------------------
+@app.route("/data", methods=["GET"])
+def data():
+    try:
+        sensor_data_ref = db.reference("sensordata")
+        all_data = sensor_data_ref.get() or {}
+        return jsonify(all_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # -------------------------
 # Health Check
