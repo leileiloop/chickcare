@@ -1,32 +1,30 @@
 from flask import Flask, render_template, jsonify, request, session, flash, url_for, redirect
 import os
-import psycopg2
-import psycopg2.extras
+import psycopg  # psycopg3, compatible with Python 3.13
 import requests
 
 # -------------------------
-# App Config
+# App Configuration
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # override in Render
 
 # -------------------------
-# Database Config
+# Database Configuration
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environment
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db_connection():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    conn.autocommit = True
+    conn = psycopg.connect(DATABASE_URL, autocommit=True, sslmode='require')
     return conn
 
 def get_db_cursor(conn):
-    return conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    return conn.cursor(row_factory=psycopg.rows.dict_row)
 
 # -------------------------
-# Initialize DB
+# Initialize Database
 # -------------------------
 def init_db():
     if not DATABASE_URL:
@@ -146,9 +144,8 @@ def run_github_sql():
         response.raise_for_status()
         sql_text = response.text
 
-        # Split commands by semicolon
-        commands = sql_text.split(";")
-        for command in commands:
+        # Execute each command separately
+        for command in sql_text.split(";"):
             cmd = command.strip()
             if cmd:
                 try:
@@ -164,9 +161,7 @@ def run_github_sql():
         if cur: cur.close()
         if conn: conn.close()
 
-# -------------------------
 # Initialize DB and load test.sql
-# -------------------------
 init_db()
 run_github_sql()
 
@@ -180,6 +175,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+
         if not username or not password:
             error = "Please provide username and password."
         else:
@@ -228,7 +224,7 @@ def register():
             cur.execute("INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)", (email, username, password))
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
-        except psycopg2.errors.UniqueViolation:
+        except psycopg.errors.UniqueViolation:
             flash("Username already taken.", "danger")
         except Exception as e:
             flash(f"DB Error: {e}", "danger")
@@ -284,7 +280,7 @@ def dashboard():
     )
 
 # -------------------------
-# Display SQL Data (from test.sql)
+# Display Chicks Data
 # -------------------------
 @app.route("/chicks")
 def chicks():
