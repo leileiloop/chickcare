@@ -1,6 +1,5 @@
 # ChickCare.py
 import os
-import json
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import firebase_admin
 from firebase_admin import credentials, db
@@ -9,24 +8,54 @@ from firebase_admin import credentials, db
 # App Config
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # override in Render
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
 # -------------------------
-# Firebase Admin SDK
+# Firebase Config
 # -------------------------
-firebase_json = os.environ.get("FIREBASE_KEY")
-if not firebase_json:
-    raise RuntimeError("FIREBASE_KEY environment variable not set.")
+# Use service account JSON stored in environment variable
+FIREBASE_CREDENTIALS = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 
-cred = credentials.Certificate(json.loads(firebase_json))
+if not FIREBASE_CREDENTIALS:
+    raise RuntimeError("FIREBASE_CREDENTIALS_JSON not set in environment variables.")
+
+cred = credentials.Certificate(eval(FIREBASE_CREDENTIALS))
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://chickencaremonitoringsystem-default-rtdb.firebaseio.com/'
+    "databaseURL": "https://chickencaremonitoringsystem-default-rtdb.firebaseio.com/"
 })
 
-# Firebase references
-users_ref = db.reference('/users')
-sensor_ref = db.reference('/sensordata')
-notifications_ref = db.reference('/notifications')
+# -------------------------
+# Helper Functions
+# -------------------------
+def get_user(username):
+    users_ref = db.reference("users")
+    users = users_ref.get() or {}
+    for uid, u in users.items():
+        if u.get("Username") == username:
+            return u
+    return None
+
+def add_user(email, username, password):
+    users_ref = db.reference("users")
+    return users_ref.push({
+        "Email": email,
+        "Username": username,
+        "Password": password
+    })
+
+def get_latest_sensor():
+    sensordata_ref = db.reference("sensordata")
+    all_data = sensordata_ref.order_by_child("DateTime").get() or {}
+    if not all_data:
+        return None
+    latest_key = max(all_data, key=lambda k: all_data[k]["DateTime"])
+    return all_data[latest_key]
+
+def get_notifications(limit=10):
+    notif_ref = db.reference("notifications")
+    all_notif = notif_ref.order_by_child("DateTime").get() or {}
+    sorted_keys = sorted(all_notif, key=lambda k: all_notif[k]["DateTime"], reverse=True)
+    return [all_notif[k] for k in sorted_keys[:limit]]
 
 # -------------------------
 # Auth Routes
@@ -41,17 +70,12 @@ def login():
 
         if not username or not password:
             error = "Please provide username and password."
+        elif username.lower() == "admin" and password == "admin":
+            session["user_role"] = "admin"
+            session["email"] = "admin@domain.com"
+            return redirect(url_for("dashboard"))
         else:
-            # Admin static login
-            if username.lower() == "admin" and password == "admin":
-                session["user_role"] = "admin"
-                session["email"] = "admin@domain.com"
-                return redirect(url_for("dashboard"))
-
-            # Firebase login
-            users = users_ref.order_by_child("Username").equal_to(username).get()
-            user = list(users.values())[0] if users else None
-
+            user = get_user(username)
             if user and user.get("Password") == password:
                 session["user_role"] = "user"
                 session["email"] = user.get("Email")
@@ -72,19 +96,12 @@ def register():
             flash("Please fill all fields.", "warning")
             return redirect(url_for("register"))
 
-        users = users_ref.order_by_child("Username").equal_to(username).get()
-        if users:
+        if get_user(username):
             flash("Username already taken.", "danger")
-            return redirect(url_for("register"))
-
-        # Save user to Firebase
-        users_ref.push({
-            "Email": email,
-            "Username": username,
-            "Password": password
-        })
-        flash("Registration successful. Please login.", "success")
-        return redirect(url_for("login"))
+        else:
+            add_user(email, username, password)
+            flash("Registration successful. Please login.", "success")
+            return redirect(url_for("login"))
 
     return render_template("register.html")
 
@@ -100,7 +117,7 @@ def logout():
 def list_shots():
     shots_folder = os.path.join(app.static_folder, "shots")
     try:
-        return [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
+        return [f for f in os.listdir(shots_folder) if f.lower().endswith((".jpg",".jpeg",".png",".gif"))]
     except Exception:
         return []
 
@@ -109,19 +126,14 @@ def dashboard():
     if "user_role" not in session:
         return redirect(url_for("login"))
 
-    # Fetch latest notifications (last 10)
-    notifications = notifications_ref.order_by_child("DateTime").limit_to_last(10).get()
-    notifications_list = list(notifications.values()) if notifications else []
-
-    # Fetch latest sensor data
-    latest_sensor = sensor_ref.order_by_child("DateTime").limit_to_last(1).get()
-    latest_sensor_data = list(latest_sensor.values())[0] if latest_sensor else None
+    notifications = get_notifications()
+    latest_sensor = get_latest_sensor()
 
     return render_template(
         "dashboard.html",
         image_files=list_shots(),
-        notifications=notifications_list,
-        data=latest_sensor_data
+        notifications=notifications,
+        data=latest_sensor
     )
 
 # -------------------------
