@@ -1,140 +1,31 @@
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
-import os
-import requests
 import psycopg
 from psycopg.rows import dict_row
+import os
 
 # -------------------------
 # App Configuration
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Change in production
+app.secret_key = "supersecretkey"  # Change in production
 
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")  # Set this in Render environment
+# External Database URL from Render
+DATABASE_URL = "postgresql://tiny_idu0_user:zh1wVHlmK2WgGxBQ2VfejYtBZrRgZe63@dpg-d433n5ali9vc73cieobg-a.oregon-postgres.render.com:5432/tiny_idu0"
 
 def get_db_connection():
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL environment variable not set")
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 # -------------------------
-# Initialize Database Tables
+# Utility Functions
 # -------------------------
-def init_db():
-    table_queries = {
-        "users": """
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                Email TEXT,
-                Username TEXT UNIQUE,
-                Password TEXT
-            )
-        """,
-        "sensordata": """
-            CREATE TABLE IF NOT EXISTS sensordata (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                Humidity REAL,
-                Temperature REAL,
-                Light1 TEXT,
-                Light2 TEXT,
-                Ammonia REAL,
-                ExhaustFan TEXT
-            )
-        """,
-        "sensordata1": """
-            CREATE TABLE IF NOT EXISTS sensordata1 (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                Food TEXT,
-                Water TEXT
-            )
-        """,
-        "sensordata2": """
-            CREATE TABLE IF NOT EXISTS sensordata2 (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                Conveyor TEXT,
-                Sprinkle TEXT,
-                UVLight TEXT
-            )
-        """,
-        "sensordata3": """
-            CREATE TABLE IF NOT EXISTS sensordata3 (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                ChickNumber TEXT,
-                Weight REAL,
-                WeighingCount INTEGER,
-                AverageWeight REAL
-            )
-        """,
-        "sensordata4": """
-            CREATE TABLE IF NOT EXISTS sensordata4 (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                Water_Level REAL,
-                Food_Level REAL
-            )
-        """,
-        "notifications": """
-            CREATE TABLE IF NOT EXISTS notifications (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                message TEXT
-            )
-        """,
-        "chickstatus": """
-            CREATE TABLE IF NOT EXISTS chickstatus (
-                id SERIAL PRIMARY KEY,
-                DateTime TIMESTAMP DEFAULT NOW(),
-                ChickNumber TEXT,
-                status TEXT
-            )
-        """,
-        "chick_records": """
-            CREATE TABLE IF NOT EXISTS chick_records (
-                id SERIAL PRIMARY KEY,
-                ChickNumber TEXT UNIQUE,
-                registration_date TIMESTAMP DEFAULT NOW()
-            )
-        """
-    }
-
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            for query in table_queries.values():
-                cur.execute(query)
-        conn.commit()
-    print("Database initialized.")
-
-# -------------------------
-# Import GitHub SQL
-# -------------------------
-def import_sql_from_github():
-    sql_url = "https://raw.githubusercontent.com/leileiloop/chickcare/main/test_utf8.sql"
-    try:
-        response = requests.get(sql_url)
-        response.raise_for_status()
-        sql_content = response.text
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                for command in sql_content.split(";"):
-                    command = command.strip()
-                    if command:
-                        cur.execute(command)
-            conn.commit()
-        print("GitHub SQL imported successfully.")
-    except Exception as e:
-        print(f"Failed to import SQL from GitHub: {e}")
-
-# Initialize database and import data
-init_db()
-import_sql_from_github()
+def list_shots():
+    shots_dir = os.path.join(app.static_folder, "shots")
+    if os.path.exists(shots_dir):
+        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
+    return []
 
 # -------------------------
 # Authentication Routes
@@ -198,15 +89,6 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
-# Utility Functions
-# -------------------------
-def list_shots():
-    shots_dir = os.path.join(app.static_folder, "shots")
-    if os.path.exists(shots_dir):
-        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
-    return []
-
-# -------------------------
 # Dashboard Routes
 # -------------------------
 @app.route("/dashboard")
@@ -229,6 +111,22 @@ def dashboard():
         data=latest_sensor
     )
 
+@app.route("/main_dashboard")
+def main_dashboard():
+    return render_template("main-dashboard.html")
+
+@app.route("/admin_dashboard")
+def admin_dashboard():
+    return render_template("admin-dashboard.html")
+
+@app.route("/manage_users")
+def manage_users():
+    return render_template("manage-users.html")
+
+@app.route("/report")
+def report():
+    return render_template("report.html")
+
 # -------------------------
 # API Endpoints
 # -------------------------
@@ -246,6 +144,25 @@ def get_data():
             )
             row = cur.fetchone()
     return jsonify(row) if row else jsonify({"error": "No data found"}), 404
+
+@app.route("/get_all_data")
+def get_all_data():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
+                "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
+            )
+            rows = cur.fetchall()
+    return jsonify(rows)
+
+@app.route("/get_all_notifications")
+def get_all_notifications():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 50")
+            rows = cur.fetchall()
+    return jsonify(rows)
 
 @app.route("/insert_notifications", methods=["POST"])
 def insert_notifications():
