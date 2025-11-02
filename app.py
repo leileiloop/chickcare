@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import os
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 
 # -------------------------
 # App Configuration
@@ -15,7 +15,7 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Change 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environment
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 # -------------------------
 # Initialize Database Tables
@@ -159,7 +159,7 @@ def register():
                     )
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
-        except psycopg2.errors.UniqueViolation:
+        except psycopg.errors.UniqueViolation:
             flash("Username already taken.", "danger")
     return render_template("register.html")
 
