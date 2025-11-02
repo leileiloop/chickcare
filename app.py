@@ -4,6 +4,7 @@ from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+import secrets
 
 # -------------------------
 # App Configuration
@@ -103,9 +104,28 @@ def logout():
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip()
-        flash("Password recovery not implemented yet.", "info")
-        return redirect(url_for("login"))
-    return render_template("forgot_password.html")  # Make sure this template exists
+        if not email:
+            flash("Please enter your email.", "warning")
+            return redirect(url_for("forgot_password"))
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE Email=%s", (email,))
+                    user = cur.fetchone()
+                    if user:
+                        # Generate a temporary password
+                        temp_password = secrets.token_urlsafe(8)  # Random secure string
+                        hashed_temp = generate_password_hash(temp_password)
+                        cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (hashed_temp, email))
+                        conn.commit()
+                        flash(f"Your temporary password is: {temp_password}", "success")
+                        return redirect(url_for("login"))
+                    else:
+                        flash("Email not found.", "danger")
+        except Exception as e:
+            flash(f"Database error: {e}", "danger")
+    return render_template("forgot_password.html")
 
 # -------------------------
 # Dashboard Routes
