@@ -15,7 +15,7 @@
                 <li>
                     <a href="#">
                         <span class="icon">
-                            <img src="static/imgs/CC.png">
+                            <img src="{{ url_for('static', filename='imgs/CC.png') }}">
                         </span>
                         <span class="title1">Chick Care</span>
                     </a>
@@ -76,7 +76,7 @@
                 </li>
 
                 <!-- Only show "Manage Users" if the logged-in user is an admin -->
-                {% if session['user_role'] == 'admin' %}
+                {% if session.get('user_role') == 'admin' %}
                 <li>
                     <a href="/manage_users">
                         <span class="icon">
@@ -119,7 +119,8 @@
                 </div>
 
 		       <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+			    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt=""> 
+                <span id="notificationCount">0</span>
 		        </div>
 		        <div class="notifi-box" id="box">
 			        <h2>Notifications <span id="notificationCount1">0</span></h2>
@@ -136,7 +137,7 @@
 
 
                 <div class="user">
-                    <img src="static/imgs/admin.jpg" alt="">
+                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
                 </div>
             </div>
 
@@ -144,13 +145,12 @@
     <!-- ========================= Main ==================== -->
 
     <div class="Notifications">
-                <h1>Notifications</h1>
-
-            </div>
+        <h1>Notifications</h1>
+    </div>
 
     <div id="table-body4" class="NotifTable">
-                <!-- Data table -->
-            <table border="1">
+        <!-- Data table -->
+        <table border="1">
             <thead>
                 <tr>
                     <th>DateTime</th>
@@ -160,11 +160,8 @@
             <tbody>
             <!-- Table data will be dynamically loaded here -->
             </tbody>
-            </table>
-        </div>
-
-
-
+        </table>
+    </div>
 
 </div>
     </div>
