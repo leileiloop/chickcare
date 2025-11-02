@@ -192,22 +192,38 @@ def dashboard():
         data=dict(latest_sensor) if latest_sensor else None
     )
 
-# Example additional pages
-@app.route("/main_dashboard")       def main_dashboard(): return render_template("main-dashboard.html")
-@app.route("/admin_dashboard")      def admin_dashboard(): return render_template("admin-dashboard.html")
-@app.route("/manage_users")         def manage_users(): return render_template("manage-users.html")
-@app.route("/report")               def report(): return render_template("report.html")
+# Correctly formatted additional pages
+@app.route("/main_dashboard")
+def main_dashboard():
+    return render_template("main-dashboard.html")
+
+@app.route("/admin_dashboard")
+def admin_dashboard():
+    return render_template("admin-dashboard.html")
+
+@app.route("/manage_users")
+def manage_users():
+    return render_template("manage-users.html")
+
+@app.route("/report")
+def report():
+    return render_template("report.html")
 
 # -------------------------
 # API Endpoints
 # -------------------------
-@app.route("/get_image_list")       def get_image_list(): return jsonify(list_shots())
+@app.route("/get_image_list")
+def get_image_list():
+    return jsonify(list_shots())
 
 @app.route("/get_data")
 def get_data():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan FROM sensordata ORDER BY DateTime DESC LIMIT 1")
+            cur.execute(
+                "SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan "
+                "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
+            )
             row = cur.fetchone()
     return jsonify(dict(row)) if row else jsonify({"error": "No data found"}), 404
 
@@ -215,7 +231,10 @@ def get_data():
 def get_all_data():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan FROM sensordata ORDER BY DateTime DESC LIMIT 10")
+            cur.execute(
+                "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
+                "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
+            )
             rows = [dict(r) for r in cur.fetchall()]
     return jsonify(rows)
 
