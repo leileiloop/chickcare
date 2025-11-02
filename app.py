@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import os
+import requests
 import psycopg
 from psycopg.rows import dict_row
 
@@ -12,9 +13,11 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Change 
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environment
+DATABASE_URL = os.environ.get("DATABASE_URL")  # Set this in Render environment
 
 def get_db_connection():
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable not set")
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 # -------------------------
@@ -108,7 +111,30 @@ def init_db():
         conn.commit()
     print("Database initialized.")
 
+# -------------------------
+# Import GitHub SQL
+# -------------------------
+def import_sql_from_github():
+    sql_url = "https://raw.githubusercontent.com/leileiloop/chickcare/main/test_utf8.sql"
+    try:
+        response = requests.get(sql_url)
+        response.raise_for_status()
+        sql_content = response.text
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for command in sql_content.split(";"):
+                    command = command.strip()
+                    if command:
+                        cur.execute(command)
+            conn.commit()
+        print("GitHub SQL imported successfully.")
+    except Exception as e:
+        print(f"Failed to import SQL from GitHub: {e}")
+
+# Initialize database and import data
 init_db()
+import_sql_from_github()
 
 # -------------------------
 # Authentication Routes
