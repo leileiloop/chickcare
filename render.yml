@@ -1,11 +1,19 @@
+# render.yaml
+
 services:
   - type: web
     name: chickcare-app
     env: python
+    region: oregon   # choose your preferred region
+    branch: main     # the branch in GitHub to deploy from
     buildCommand: |
+      pip install --upgrade pip
       pip install -r requirements.txt
-      # Initialize database with your test.sql
-      psql $DATABASE_URL -f test.sql
+      # Import the SQL file if it exists
+      if [ -f test_utf8_pg_clean.sql ]; then
+        echo "Initializing database from test_utf8_pg_clean.sql..."
+        psql $DATABASE_URL -f test_utf8_pg_clean.sql
+      fi
     startCommand: python ChickCare.py
     envVars:
       - key: DATABASE_URL
