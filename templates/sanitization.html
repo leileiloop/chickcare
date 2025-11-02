@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Sanitization</title>
-<!-- ======= Styles ====== -->
+    <!-- ======= Styles ====== -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -75,7 +75,6 @@
                     </a>
                 </li>
 
-                <!-- Only show "Manage Users" if the logged-in user is an admin -->
                 {% if session['user_role'] == 'admin' %}
                 <li>
                     <a href="/manage_users">
@@ -118,131 +117,111 @@
                     <span id="displayDateTime"></span>
                 </div>
 
-
-		        <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
-		        </div>
-		        <div class="notifi-box" id="box">
-			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
-
-				    <div class="text" id="notificationItems">
-
-			        </div>
-			    </div>
-
-
-		        </div>
-
+                <div class="iconn" onclick="toggleNotifi()">
+                    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+                </div>
+                <div class="notifi-box" id="box">
+                    <h2>Notifications <span id="notificationCount1">0</span></h2>
+                    <div class="notifi-item">
+                        <div class="text" id="notificationItems"></div>
+                    </div>
+                </div>
 
                 <div class="user">
                     <img src="static/imgs/admin.jpg" alt="">
                 </div>
             </div>
 
-        <!-- ========================= Sanitization ==================== -->
+            <!-- ========================= Sanitization ==================== -->
             <div class="status1">
-                    <h1>Sanitization</h1>
+                <h1>Sanitization</h1>
                 <div class="cBox">
 
-                <div class="cd">
+                    <div class="cd">
+                        <div>
+                            <div class="num" id="status_cvyr"></div>
+                            <div class="cName">Conveyor</div>
+                        </div>
 
-                    <div>
-                        <div class="num" id="status_cvyr"></div>
-                        <div class="cName">Conveyor</div>
+                        <div class="icBx">
+                            <img class="convy" src="/static/imgs/conveyor.png">
+                        </div>
+
+                        <!-- Emergency Stop Button -->
+                        <button id="stopConveyor" class="stop-btn">STOP</button>
                     </div>
 
-                    <div class="icBx">
-                        <img class="convy" src="/static/imgs/conveyor.png">
+                    <div class="cd">
+                        <div>
+                            <div class="num" id="sprkl"></div>
+                            <div class="cName">Sprinkle</div>
+                        </div>
+
+                        <div class="icBx">
+                            <img class="sprink" src="/static/imgs/sprinkle.png">
+                        </div>
+
+                        <!-- Emergency Stop Button -->
+                        <button id="stopSprinkle" class="stop-btn">STOP</button>
                     </div>
-
-                    <!-- Emergency Stop Button -->
-                    <button id="stopConveyor" class="stop-btn">STOP</button>
-
                 </div>
-
-                <div class="cd">
-                    <div>
-                        <div class="num" id="sprkl"></div>
-                        <div class="cName">Sprinkle</div>
-                    </div>
-
-                    <div class="icBx">
-                        <img class="sprink" src="/static/imgs/sprinkle.png">
-                    </div>
-
-                    <!-- Emergency Stop Buttons -->
-                    <button id="stopSprinkle" class="stop-btn">STOP</button>
-
-                </div>
-            </div>
 
                 <div class="cBox1">
+                    <div class="cd">
+                        <div>
+                            <div class="num" id="uvc_status"></div>
+                            <div class="cName">UVC Light</div>
+                        </div>
 
-                <div class="cd">
-                    <div>
-                        <div class="num" id="uvc_status"></div>
-                        <div class="cName">UVC Light</div>
+                        <div class="icBx">
+                            <img class="uvcl" id="uvcImage" src="/static/imgs/UVCoff.png">
+                        </div>
+
+                        <!-- Emergency Stop Button -->
+                        <button id="stopUVLight" class="stop-btn">STOP</button>
                     </div>
-
-                    <div class="icBx">
-                        <img class="uvcl" id="uvcImage" src="/static/imgs/UVCoff.png">
-                    </div>
-
-                    <!-- Emergency Stop Buttons -->
-                    <button id="stopUVLight" class="stop-btn">STOP</button>
-
-                </div>
 
                     <script>
-  function changeImage() {
-    const status = document.getElementById('status_uvc').innerText;  // Get the current status (ON or OFF)
-    const image = document.getElementById('uvcImage');  // Get the image element
+                        function changeImage() {
+                            const status = document.getElementById('status_uvc').innerText;
+                            const image = document.getElementById('uvcImage');
 
-    if (status === 'ON') {
-      image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCon.png';  // Change to "ON" image
-    } else if (status === 'OFF') {
-      image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCoff.png';  // Change to "OFF" image
-    }
-  }
+                            if (status === 'ON') {
+                                image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCon.png';
+                            } else if (status === 'OFF') {
+                                image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCoff.png';
+                            }
+                        }
 
-  // Call the function to set the image on page load
-  changeImage();
-
-</script>
-
-            </div>
-
+                        // Set the image on page load
+                        changeImage();
+                    </script>
+                </div>
             </div>
 
             <div id="table-body" class="SanitizationTable">
-                <!-- Data table -->
-            <table border="1">
-            <thead>
-                <tr>
-                    <th>DateTime</th>
-                    <th>Conveyor</th>
-                    <th>Sprinkle</th>
-                    <th>UVLight</th>
-                </tr>
-            </thead>
-            <tbody >
-            <!-- Table data will be dynamically loaded here -->
-            </tbody>
-            </table>
-        </div>
+                <table border="1">
+                    <thead>
+                        <tr>
+                            <th>DateTime</th>
+                            <th>Conveyor</th>
+                            <th>Sprinkle</th>
+                            <th>UVLight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Table data will be dynamically loaded here -->
+                    </tbody>
+                </table>
+            </div>
 
         </div>
     </div>
 
-
-
-
-
-
     <!-- ====== ionicons ======= -->
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
     <!-- =========== Scripts =========  -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
