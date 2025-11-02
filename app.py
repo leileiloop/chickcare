@@ -1,6 +1,8 @@
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.errors import UniqueViolation
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 # -------------------------
@@ -12,7 +14,6 @@ app.secret_key = "supersecretkey"  # Change in production
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-# External Database URL from Render
 DATABASE_URL = "postgresql://tiny_idu0_user:zh1wVHlmK2WgGxBQ2VfejYtBZrRgZe63@dpg-d433n5ali9vc73cieobg-a.oregon-postgres.render.com:5432/tiny_idu0"
 
 def get_db_connection():
@@ -41,20 +42,25 @@ def login():
         if not username or not password:
             error = "Please provide username and password."
         elif username.lower() == "admin" and password == "admin":
-            session.update({"user_role": "admin", "email": "admin@yourdomain.com"})
+            session["user_role"] = "admin"
+            session["email"] = "admin@yourdomain.com"
             return redirect(url_for("dashboard"))
         else:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT * FROM users WHERE Username=%s AND Password=%s",
-                        (username, password)
-                    )
-                    user = cur.fetchone()
-            if user:
-                session.update({"user_role": "user", "email": user["Email"]})
-                return redirect(url_for("dashboard"))
-            error = "Invalid credentials."
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT * FROM users WHERE Username=%s",
+                            (username,)
+                        )
+                        user = cur.fetchone()
+                        if user and check_password_hash(user["Password"], password):
+                            session["user_role"] = "user"
+                            session["email"] = user["Email"]
+                            return redirect(url_for("dashboard"))
+                        error = "Invalid credentials."
+            except Exception as e:
+                error = f"Database error: {e}"
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -68,18 +74,21 @@ def register():
             flash("Please fill all fields.", "warning")
             return redirect(url_for("register"))
 
+        hashed_password = generate_password_hash(password)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
-                        (email, username, password)
+                        (email, username, hashed_password)
                     )
                 conn.commit()
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
-        except psycopg.errors.UniqueViolation:
+        except UniqueViolation:
             flash("Username already taken.", "danger")
+        except Exception as e:
+            flash(f"Error: {e}", "danger")
     return render_template("register.html")
 
 @app.route("/logout")
@@ -143,7 +152,7 @@ def get_data():
                 "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
             )
             row = cur.fetchone()
-    return jsonify(row) if row else jsonify({"error": "No data found"}), 404
+    return jsonify(row or {"Temp": None, "Hum": None, "Light1": None, "Light2": None, "Amm": None, "ExhaustFan": None})
 
 @app.route("/get_all_data")
 def get_all_data():
