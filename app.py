@@ -28,7 +28,7 @@ def get_db_connection():
 # Utility Functions
 # -------------------------
 def list_shots():
-    """List image files in static/shots."""
+    """Return a list of image files in static/shots."""
     shots_dir = os.path.join(app.static_folder, "shots")
     if os.path.exists(shots_dir):
         return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
@@ -64,6 +64,7 @@ def login():
                         error = "Invalid credentials."
             except Exception as e:
                 error = f"Database error: {e}"
+
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -91,7 +92,8 @@ def register():
         except UniqueViolation:
             flash("Username already taken.", "danger")
         except Exception as e:
-            flash(f"Error: {e}", "danger")
+            flash(f"Database error: {e}", "danger")
+
     return render_template("register.html")
 
 @app.route("/logout")
@@ -114,8 +116,7 @@ def forgot_password():
                     cur.execute("SELECT * FROM users WHERE Email=%s", (email,))
                     user = cur.fetchone()
                     if user:
-                        # Generate a temporary password
-                        temp_password = secrets.token_urlsafe(8)  # Random secure string
+                        temp_password = secrets.token_urlsafe(8)
                         hashed_temp = generate_password_hash(temp_password)
                         cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (hashed_temp, email))
                         conn.commit()
@@ -125,6 +126,7 @@ def forgot_password():
                         flash("Email not found.", "danger")
         except Exception as e:
             flash(f"Database error: {e}", "danger")
+
     return render_template("forgot_password.html")
 
 # -------------------------
