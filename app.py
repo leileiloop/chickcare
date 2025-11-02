@@ -105,6 +105,7 @@ def init_db():
         with conn.cursor() as cur:
             for query in table_queries.values():
                 cur.execute(query)
+        conn.commit()
     print("Database initialized.")
 
 init_db()
@@ -157,6 +158,7 @@ def register():
                         "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
                         (email, username, password)
                     )
+                conn.commit()
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
         except psycopg.errors.UniqueViolation:
@@ -189,7 +191,7 @@ def dashboard():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
-            notifications = [dict(r) for r in cur.fetchall()]
+            notifications = cur.fetchall()
 
             cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
             latest_sensor = cur.fetchone()
@@ -198,24 +200,8 @@ def dashboard():
         "dashboard.html",
         image_files=list_shots(),
         notifications=notifications,
-        data=dict(latest_sensor) if latest_sensor else None
+        data=latest_sensor
     )
-
-@app.route("/main_dashboard")
-def main_dashboard():
-    return render_template("main-dashboard.html")
-
-@app.route("/admin_dashboard")
-def admin_dashboard():
-    return render_template("admin-dashboard.html")
-
-@app.route("/manage_users")
-def manage_users():
-    return render_template("manage-users.html")
-
-@app.route("/report")
-def report():
-    return render_template("report.html")
 
 # -------------------------
 # API Endpoints
@@ -233,26 +219,7 @@ def get_data():
                 "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
             )
             row = cur.fetchone()
-    return jsonify(dict(row)) if row else jsonify({"error": "No data found"}), 404
-
-@app.route("/get_all_data")
-def get_all_data():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
-                "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
-            )
-            rows = [dict(r) for r in cur.fetchall()]
-    return jsonify(rows)
-
-@app.route("/get_all_notifications")
-def get_all_notifications():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 50")
-            rows = [dict(r) for r in cur.fetchall()]
-    return jsonify(rows)
+    return jsonify(row) if row else jsonify({"error": "No data found"}), 404
 
 @app.route("/insert_notifications", methods=["POST"])
 def insert_notifications():
@@ -264,6 +231,7 @@ def insert_notifications():
         with conn.cursor() as cur:
             for msg in items:
                 cur.execute("INSERT INTO notifications (message) VALUES (%s)", (msg,))
+        conn.commit()
     return jsonify({"success": True, "inserted": len(items)})
 
 # -------------------------
