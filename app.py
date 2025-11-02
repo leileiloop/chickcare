@@ -9,12 +9,15 @@ import os
 # App Configuration
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = "supersecretkey"  # Change in production
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # Change in production
 
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = "postgresql://tiny_idu0_user:zh1wVHlmK2WgGxBQ2VfejYtBZrRgZe63@dpg-d433n5ali9vc73cieobg-a.oregon-postgres.render.com:5432/tiny_idu0"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://tiny_idu0_user:zh1wVHlmK2WgGxBQ2VfejYtBZrRgZe63@dpg-d433n5ali9vc73cieobg-a.oregon-postgres.render.com:5432/tiny_idu0"
+)
 
 def get_db_connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
@@ -49,10 +52,7 @@ def login():
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
-                        cur.execute(
-                            "SELECT * FROM users WHERE Username=%s",
-                            (username,)
-                        )
+                        cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
                             session["user_role"] = "user"
@@ -86,6 +86,7 @@ def register():
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
         except UniqueViolation:
+            conn.rollback()
             flash("Username already taken.", "danger")
         except Exception as e:
             flash(f"Error: {e}", "danger")
@@ -96,6 +97,14 @@ def logout():
     session.clear()
     flash("Logged out.", "info")
     return redirect(url_for("login"))
+
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        flash("Password recovery not implemented yet.", "info")
+        return redirect(url_for("login"))
+    return render_template("forgot_password.html")  # create this template
 
 # -------------------------
 # Dashboard Routes
