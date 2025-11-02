@@ -1,14 +1,11 @@
 services:
   - type: web
-    name: chickcare
+    name: chickcare-app
     env: python
-    plan: free
     buildCommand: |
       pip install -r requirements.txt
-      # Check if test.sql exists and then run it
-      if [ -f test.sql ]; then
-        psql $DATABASE_URL -f test.sql
-      fi
+      # Initialize database with your test.sql
+      psql $DATABASE_URL -f test.sql
     startCommand: python ChickCare.py
     envVars:
       - key: DATABASE_URL
@@ -19,5 +16,5 @@ services:
 databases:
   - name: chickcare-db
     databaseName: chickcare
-    user: chickcare
+    user: chickcare_user
     plan: free
