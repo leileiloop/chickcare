@@ -4,21 +4,21 @@ import psycopg2
 import psycopg2.extras
 
 # -------------------------
-# App Config
+# App Configuration
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Change in production
 
 # -------------------------
-# PostgreSQL DB Config
+# PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")  # Set in environment
+DATABASE_URL = os.environ.get("DATABASE_URL")  # Must be set in Render environment
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
 
 # -------------------------
-# Initialize DB Tables
+# Initialize Database Tables
 # -------------------------
 def init_db():
     table_queries = {
@@ -110,7 +110,7 @@ def init_db():
 init_db()
 
 # -------------------------
-# Authentication
+# Authentication Routes
 # -------------------------
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
@@ -128,14 +128,16 @@ def login():
         else:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM users WHERE Username=%s AND Password=%s", (username, password))
+                    cur.execute(
+                        "SELECT * FROM users WHERE Username=%s AND Password=%s",
+                        (username, password)
+                    )
                     user = cur.fetchone()
             if user:
                 session.update({"user_role": "user", "email": user["Email"]})
                 return redirect(url_for("dashboard"))
             error = "Invalid credentials."
     return render_template("login.html", error=error)
-
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -151,13 +153,15 @@ def register():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)", (email, username, password))
+                    cur.execute(
+                        "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
+                        (email, username, password)
+                    )
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
         except psycopg2.errors.UniqueViolation:
             flash("Username already taken.", "danger")
     return render_template("register.html")
-
 
 @app.route("/logout")
 def logout():
@@ -166,12 +170,17 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
-# Dashboard + Pages
+# Utility Functions
 # -------------------------
 def list_shots():
     shots_dir = os.path.join(app.static_folder, "shots")
-    return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))] if os.path.exists(shots_dir) else []
+    if os.path.exists(shots_dir):
+        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
+    return []
 
+# -------------------------
+# Dashboard Routes
+# -------------------------
 @app.route("/dashboard")
 def dashboard():
     if "user_role" not in session:
@@ -192,7 +201,6 @@ def dashboard():
         data=dict(latest_sensor) if latest_sensor else None
     )
 
-# Correctly formatted additional pages
 @app.route("/main_dashboard")
 def main_dashboard():
     return render_template("main-dashboard.html")
@@ -266,7 +274,7 @@ def health():
     return jsonify({"status": "ok"})
 
 # -------------------------
-# Main
+# Main Entry
 # -------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
