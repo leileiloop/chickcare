@@ -41,23 +41,37 @@
 </head>
 <body>
   <div class="container">
+    <!-- Modified Navigation for Admin -->
     <div class="navigation">
       <ul>
-        <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
-        <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
-        <li><a href="/login">Sign Out</a></li>
+        <li>
+          <a href="#manageUsers" class="tab-link active">Manage Users</a>
+        </li>
+        <li>
+          <a href="#systemFunctions" class="tab-link">System Functions</a>
+        </li>
+        <li>
+          <a href="/login">Sign Out</a>
+        </li>
       </ul>
     </div>
 
+    <!-- Main Admin Content -->
     <div class="main">
       <div class="topbar">
-        <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
-        <div class="datetime"><span id="displayDateTime"></span></div>
+        <div class="toggle">
+          <ion-icon name="menu-outline"></ion-icon>
+        </div>
+        <div class="datetime">
+          <span id="displayDateTime"></span>
+        </div>
         <div class="iconn" onclick="toggleNotifi()">
           <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="">
           <span id="notificationCount">0</span>
         </div>
-        <div class="user"><img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt=""></div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
+        </div>
       </div>
 
       <!-- Admin Tabs -->
@@ -71,6 +85,7 @@
       <!-- Tab Content: Manage Users -->
       <div id="manageUsers" class="tab-content active">
         <h1>Manage Users</h1>
+        <!-- User Management Table -->
         <div id="table-users">
           <table border="1">
             <thead>
@@ -81,7 +96,9 @@
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody>
+              <!-- User data dynamically loaded from the database -->
+            </tbody>
           </table>
         </div>
       </div>
@@ -89,6 +106,7 @@
       <!-- Tab Content: System Functions -->
       <div id="systemFunctions" class="tab-content">
         <h1>System Functions</h1>
+        <!-- System Management Table (e.g., Notifications, Logs, Reports) -->
         <div id="table-system">
           <table border="1">
             <thead>
@@ -97,7 +115,9 @@
                 <th>Message</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody>
+              <!-- System logs or notification data dynamically loaded -->
+            </tbody>
           </table>
         </div>
       </div>
@@ -105,74 +125,29 @@
     </div>
   </div>
 
-  <!-- Ionicons -->
+  <!-- =========== Ionicons Scripts =========  -->
   <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
   <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-
-  <!-- Main Scripts -->
+  <!-- =========== Main Scripts =========  -->
   <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-
   <script>
-    // Tab switching
+    // JavaScript for admin tab switching
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
+
     tabLinks.forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
-        tabLinks.forEach(l => l.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
+        // Remove active class from all tab links and contents
+        tabLinks.forEach(link => link.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+
+        // Add active class to the clicked tab and its corresponding content
         this.classList.add('active');
-        document.querySelector(this.getAttribute('href')).classList.add('active');
+        const target = this.getAttribute('href');
+        document.querySelector(target).classList.add('active');
       });
     });
-
-    // Fetch users and populate table
-    async function loadUsers() {
-      const res = await fetch('/api/users');
-      const users = await res.json();
-      const tbody = document.querySelector('#table-users tbody');
-      tbody.innerHTML = '';
-      users.forEach(u => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${u.id}</td>
-            <td>${u.email}</td>
-            <td>${u.username}</td>
-            <td>
-              <button onclick="deleteUser(${u.id})">Delete</button>
-            </td>
-          </tr>
-        `;
-      });
-    }
-
-    // Fetch system logs
-    async function loadSystemLogs() {
-      const res = await fetch('/api/system_logs');
-      const logs = await res.json();
-      const tbody = document.querySelector('#table-system tbody');
-      tbody.innerHTML = '';
-      logs.forEach(log => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${log.datetime}</td>
-            <td>${log.message}</td>
-          </tr>
-        `;
-      });
-    }
-
-    // Example delete function
-    async function deleteUser(id) {
-      const confirmed = confirm("Delete this user?");
-      if (!confirmed) return;
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
-      loadUsers(); // refresh table
-    }
-
-    // Initial load
-    loadUsers();
-    loadSystemLogs();
   </script>
 </body>
 </html>
