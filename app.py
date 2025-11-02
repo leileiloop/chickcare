@@ -20,12 +20,14 @@ DATABASE_URL = os.environ.get(
 )
 
 def get_db_connection():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    """Connect to PostgreSQL with SSL."""
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, sslmode="require")
 
 # -------------------------
 # Utility Functions
 # -------------------------
 def list_shots():
+    """List image files in static/shots."""
     shots_dir = os.path.join(app.static_folder, "shots")
     if os.path.exists(shots_dir):
         return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
@@ -86,7 +88,6 @@ def register():
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
         except UniqueViolation:
-            conn.rollback()
             flash("Username already taken.", "danger")
         except Exception as e:
             flash(f"Error: {e}", "danger")
@@ -104,7 +105,7 @@ def forgot_password():
         email = request.form.get("email", "").strip()
         flash("Password recovery not implemented yet.", "info")
         return redirect(url_for("login"))
-    return render_template("forgot_password.html")  # create this template
+    return render_template("forgot_password.html")  # Make sure this template exists
 
 # -------------------------
 # Dashboard Routes
