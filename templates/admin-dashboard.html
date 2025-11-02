@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin Dashboard | Chick Care</title>
-  <!-- ======= Styles ====== -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
-    /* Minimal custom styles for admin tab navigation */
     .admin-tabs {
       margin: 20px;
     }
@@ -41,22 +39,14 @@
 </head>
 <body>
   <div class="container">
-    <!-- Modified Navigation for Admin -->
     <div class="navigation">
       <ul>
-        <li>
-          <a href="#manageUsers" class="tab-link active">Manage Users</a>
-        </li>
-        <li>
-          <a href="#systemFunctions" class="tab-link">System Functions</a>
-        </li>
-        <li>
-          <a href="/login">Sign Out</a>
-        </li>
+        <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
+        <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
+        <li><a href="/login">Sign Out</a></li>
       </ul>
     </div>
 
-    <!-- Main Admin Content -->
     <div class="main">
       <div class="topbar">
         <div class="toggle">
@@ -74,7 +64,6 @@
         </div>
       </div>
 
-      <!-- Admin Tabs -->
       <div class="admin-tabs">
         <ul>
           <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
@@ -82,10 +71,8 @@
         </ul>
       </div>
 
-      <!-- Tab Content: Manage Users -->
       <div id="manageUsers" class="tab-content active">
         <h1>Manage Users</h1>
-        <!-- User Management Table -->
         <div id="table-users">
           <table border="1">
             <thead>
@@ -97,16 +84,23 @@
               </tr>
             </thead>
             <tbody>
-              <!-- User data dynamically loaded from the database -->
+              {% for user in users %}
+              <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.Email }}</td>
+                <td>{{ user.Username }}</td>
+                <td>
+                  <!-- Actions: Edit/Delete -->
+                </td>
+              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Tab Content: System Functions -->
       <div id="systemFunctions" class="tab-content">
         <h1>System Functions</h1>
-        <!-- System Management Table (e.g., Notifications, Logs, Reports) -->
         <div id="table-system">
           <table border="1">
             <thead>
@@ -116,7 +110,12 @@
               </tr>
             </thead>
             <tbody>
-              <!-- System logs or notification data dynamically loaded -->
+              {% for notif in notifications %}
+              <tr>
+                <td>{{ notif.DateTime }}</td>
+                <td>{{ notif.message }}</td>
+              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -125,27 +124,20 @@
     </div>
   </div>
 
-  <!-- =========== Ionicons Scripts =========  -->
   <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
   <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-  <!-- =========== Main Scripts =========  -->
   <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
   <script>
-    // JavaScript for admin tab switching
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
 
     tabLinks.forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
-        // Remove active class from all tab links and contents
-        tabLinks.forEach(link => link.classList.remove('active'));
-        tabContents.forEach(content => content.classList.remove('active'));
-
-        // Add active class to the clicked tab and its corresponding content
+        tabLinks.forEach(l => l.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
         this.classList.add('active');
-        const target = this.getAttribute('href');
-        document.querySelector(target).classList.add('active');
+        document.querySelector(this.getAttribute('href')).classList.add('active');
       });
     });
   </script>
