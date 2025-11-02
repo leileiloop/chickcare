@@ -2,147 +2,178 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Notifications | Chick Care</title>
+    <title>Notifications</title>
+    <!-- ======= Styles ====== -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Minimal adjustments for notifications table */
-        .NotifTable {
-            margin: 20px;
-        }
-        .NotifTable table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .NotifTable th, .NotifTable td {
-            border: 1px solid #ccc;
-            padding: 10px;
-            text-align: left;
-        }
-        .notifi-box {
-            display: none;
-            position: absolute;
-            top: 50px;
-            right: 20px;
-            width: 300px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: #fff;
-            border: 1px solid #ccc;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 10px;
-            z-index: 1000;
-        }
-        .notifi-item {
-            margin-bottom: 10px;
-        }
-        .notifi-item .text {
-            font-size: 14px;
-        }
-    </style>
 </head>
 
 <body>
+    <!-- =============== Navigation ================ -->
     <div class="container">
-        <!-- Sidebar Navigation -->
         <div class="navigation">
             <ul>
                 <li>
                     <a href="#">
-                        <span class="icon"><img src="{{ url_for('static', filename='imgs/CC.png') }}"></span>
+                        <span class="icon">
+                            <img src="static/imgs/CC.png">
+                        </span>
                         <span class="title1">Chick Care</span>
                     </a>
                 </li>
-                <li><a href="/main_dashboard"><span class="icon"><ion-icon name="reorder-four-outline"></ion-icon></span><span class="title">Dashboard</span></a></li>
-                <li><a href="/webcam"><span class="icon"><ion-icon name="stats-chart-outline"></ion-icon></span><span class="title">Growth Tracking</span></a></li>
-                <li><a href="/feeding"><span class="icon"><ion-icon name="layers-outline"></ion-icon></span><span class="title">Supplies Stock</span></a></li>
-                <li><a href="/environment"><span class="icon"><ion-icon name="cloudy-outline"></ion-icon></span><span class="title">Environment</span></a></li>
-                <li><a href="/dashboard" class="active"><span class="icon"><ion-icon name="notifications-circle-outline"></ion-icon></span><span class="title">Notifications</span></a></li>
-                <li><a href="/sanitization"><span class="icon"><ion-icon name="water-outline"></ion-icon></span><span class="title">Sanitization</span></a></li>
+
+                <li>
+                    <a href="/main_dashboard">
+                        <span class="icon">
+                            <ion-icon name="reorder-four-outline"></ion-icon>
+                        </span>
+                        <span class="title">Dashboard</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/webcam">
+                        <span class="icon">
+                            <ion-icon name="stats-chart-outline"></ion-icon>
+                        </span>
+                        <span class="title">Growth Tracking</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/feeding">
+                        <span class="icon">
+                            <ion-icon name="layers-outline"></ion-icon>
+                        </span>
+                        <span class="title">Supplies Stock</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/environment">
+                        <span class="icon">
+                            <ion-icon name="cloudy-outline"></ion-icon>
+                        </span>
+                        <span class="title">Environment</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/dashboard">
+                        <span class="icon">
+                            <ion-icon name="notifications-circle-outline"></ion-icon>
+                        </span>
+                        <span class="title">Notifications</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/sanitization">
+                        <span class="icon">
+                            <ion-icon name="water-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sanitization</span>
+                    </a>
+                </li>
+
+                <!-- Only show "Manage Users" if the logged-in user is an admin -->
                 {% if session['user_role'] == 'admin' %}
-                <li><a href="/manage_users"><span class="icon"><ion-icon name="people-outline"></ion-icon></span><span class="title">Manage Users</span></a></li>
+                <li>
+                    <a href="/manage_users">
+                        <span class="icon">
+                            <ion-icon name="people-outline"></ion-icon>
+                        </span>
+                        <span class="title">Manage Users</span>
+                    </a>
+                </li>
                 {% endif %}
-                <li><a href="/report"><span class="icon"><ion-icon name="file-tray-stacked-outline"></ion-icon></span><span class="title">Report</span></a></li>
-                <li><a href="/login"><span class="icon"><ion-icon name="log-out-outline"></ion-icon></span><span class="title">Sign Out</span></a></li>
+
+                <li>
+                    <a href="/report">
+                        <span class="icon">
+                            <ion-icon name="file-tray-stacked-outline"></ion-icon>
+                        </span>
+                        <span class="title">Report</span>
+                    </a>
+                </li>
+
+                <li>
+                    <a href="/login">
+                        <span class="icon">
+                            <ion-icon name="log-out-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sign Out</span>
+                    </a>
+                </li>
             </ul>
         </div>
 
-        <!-- Main Content -->
+        <!-- ========================= Main ==================== -->
         <div class="main">
             <div class="topbar">
-                <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
-                <div class="datetime"><span id="displayDateTime"></span></div>
-
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="">
-                    <span id="notificationCount">0</span>
+                <div class="toggle">
+                    <ion-icon name="menu-outline"></ion-icon>
                 </div>
 
-                <div class="notifi-box" id="box">
-                    <h2>Notifications <span id="notificationCount1">0</span></h2>
-                    <div class="notifi-item">
-                        <div class="text" id="notificationItems"></div>
-                    </div>
+                <div class="datetime">
+                    <span id="displayDateTime"></span>
                 </div>
+
+		       <div class="iconn" onclick="toggleNotifi()">
+			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+		        </div>
+		        <div class="notifi-box" id="box">
+			        <h2>Notifications <span id="notificationCount1">0</span></h2>
+			    <div class="notifi-item">
+
+				    <div class="text" id="notificationItems">
+
+			        </div>
+			    </div>
+
+
+		        </div>
+
+
 
                 <div class="user">
-                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
+                    <img src="static/imgs/admin.jpg" alt="">
                 </div>
             </div>
 
-            <div class="Notifications">
+
+    <!-- ========================= Main ==================== -->
+
+    <div class="Notifications">
                 <h1>Notifications</h1>
+
             </div>
 
-            <div id="table-body4" class="NotifTable">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>DateTime</th>
-                            <th>Message</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+    <div id="table-body4" class="NotifTable">
+                <!-- Data table -->
+            <table border="1">
+            <thead>
+                <tr>
+                    <th>DateTime</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+            <!-- Table data will be dynamically loaded here -->
+            </tbody>
+            </table>
         </div>
+
+
+
+
+</div>
     </div>
 
-    <!-- Ionicons -->
+    <!-- ====== ionicons ======= -->
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-
-    <script>
-        // Toggle notification box
-        function toggleNotifi() {
-            const box = document.getElementById('box');
-            box.style.display = box.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // Load notifications dynamically
-        async function loadNotifications() {
-            const res = await fetch('/api/notifications');
-            const notifications = await res.json();
-
-            const tableBody = document.querySelector('#table-body4 tbody');
-            const notifBox = document.getElementById('notificationItems');
-            tableBody.innerHTML = '';
-            notifBox.innerHTML = '';
-            
-            notifications.forEach(n => {
-                // Table
-                tableBody.innerHTML += `<tr><td>${n.datetime}</td><td>${n.message}</td></tr>`;
-                // Topbar notification dropdown
-                notifBox.innerHTML += `<p>${n.datetime}: ${n.message}</p>`;
-            });
-
-            document.getElementById('notificationCount').innerText = notifications.length;
-            document.getElementById('notificationCount1').innerText = notifications.length;
-        }
-
-        // Initial load
-        loadNotifications();
-        // Optional: refresh every 10 seconds
-        setInterval(loadNotifications, 10000);
-    </script>
+    <!-- =========== Scripts =========  -->
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
+
 </html>
