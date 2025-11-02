@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Environment</title>
-<!-- ======= Styles ====== -->
+    <!-- ======= Styles ====== -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Include Chart.js library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17,7 +17,7 @@
                 <li>
                     <a href="#">
                         <span class="icon">
-                            <img src="static/imgs/CC.png">
+                            <img src="{{ url_for('static', filename='imgs/CC.png') }}">
                         </span>
                         <span class="title1">Chick Care</span>
                     </a>
@@ -78,7 +78,7 @@
                 </li>
 
                 <!-- Only show "Manage Users" if the logged-in user is an admin -->
-                {% if session['user_role'] == 'admin' %}
+                {% if session.get('user_role') == 'admin' %}
                 <li>
                     <a href="/manage_users">
                         <span class="icon">
@@ -120,41 +120,33 @@
                     <span id="displayDateTime"></span>
                 </div>
 
-
 		        <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+			        <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt=""> 
+                    <span id="notificationCount">0</span>
 		        </div>
 		        <div class="notifi-box" id="box">
 			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
-
-				    <div class="text" id="notificationItems">
-
+			        <div class="notifi-item">
+				        <div class="text" id="notificationItems"></div>
 			        </div>
-			    </div>
-
-
 		        </div>
 
-
                 <div class="user">
-                    <img src="static/imgs/admin.jpg" alt="">
+                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
                 </div>
             </div>
 
         <!-- ========================= Environment ==================== -->
-            <div class="status">
-                    <h1>Environment</h1>
-                <div class="cardBox">
-
+        <div class="status">
+            <h1>Environment</h1>
+            <div class="cardBox">
                 <div class="card">
                     <div>
                         <div id="hum" class="numbers"></div>
                         <div class="cardName">Humidity</div>
                     </div>
-
                     <div class="iconBx">
-                        <img class="humid" src="/static/imgs/humidity.png">
+                        <img class="humid" src="{{ url_for('static', filename='imgs/humidity.png') }}">
                     </div>
                 </div>
 
@@ -163,9 +155,8 @@
                         <div id="temp" class="numbers"></div>
                         <div class="cardName">Temperature</div>
                     </div>
-
                     <div class="iconBx">
-                        <img class="temp" src="/static/imgs/temperature.png">
+                        <img class="temp" src="{{ url_for('static', filename='imgs/temperature.png') }}">
                     </div>
                 </div>
                 
@@ -174,100 +165,91 @@
                         <div id="amm" class="numbers"></div>
                         <div class="cardName">Ammonia</div>
                     </div>
-
                     <div class="iconBx">
-                        <img class="amm" src="/static/imgs/ammonia.jpg">
-                    </div>
-                </div>
-                
-            </div>
-            </div>
-
-            <div class="cardBox1">
-                	<div class="card">
-    		<div>
-        		<div class="numbers" id="light1-status"></div>
-        		<div class="cardName">Light 1</div>
-    		</div>
-    		<div class="iconBx">
-        		<img class="l1-btn" id="light1" src="/static/imgs/LightA.png" alt="Light 1">
-    		</div>
-		</div>
-
-		<div class="card">
-    		<div>
-        		<div class="numbers" id="light2-status"></div>
-        		<div class="cardName">Light 2</div>
-    		</div>
-    		<div class="iconBx">
-        		<img class="l2-btn" id="light2" src="/static/imgs/LightA.png" alt="Light 2">
-    		</div>
-		</div>
-
-                <div class="card">
-    		<div>
-        		<div class="numbers" id="exhaustfan-status"></div>
-        		<div class="cardName">Exhaust Fan</div>
-    		</div>
-    		<div class="iconBx">
-        		<img class="x-fan-btn" id="exhaustfan" src="/static/imgs/exhaust-fan.png" alt="Light 4">
-    		</div>
-		</div>
-
-            </div>
-
-            <div class="charts">
-                        <div class="chart">
-                            <h2>Temperature</h2>
-                    <div>
-                            <canvas id="lineChart"></canvas>
+                        <img class="amm" src="{{ url_for('static', filename='imgs/ammonia.jpg') }}">
                     </div>
                 </div>
             </div>
+        </div>
 
-                    <div class="charts">
-                        <div class="chart">
-                            <h2>Humidity</h2>
-                    <div>
-                            <canvas id="lineChart1"></canvas>
-                    </div>
+        <div class="cardBox1">
+            <div class="card">
+                <div>
+                    <div class="numbers" id="light1-status"></div>
+                    <div class="cardName">Light 1</div>
                 </div>
+                <div class="iconBx">
+                    <img class="l1-btn" id="light1" src="{{ url_for('static', filename='imgs/LightA.png') }}" alt="Light 1">
+                </div>
+            </div>
 
-            <div class="EnviTable">
-                <!-- Data table -->
+            <div class="card">
+                <div>
+                    <div class="numbers" id="light2-status"></div>
+                    <div class="cardName">Light 2</div>
+                </div>
+                <div class="iconBx">
+                    <img class="l2-btn" id="light2" src="{{ url_for('static', filename='imgs/LightA.png') }}" alt="Light 2">
+                </div>
+            </div>
+
+            <div class="card">
+                <div>
+                    <div class="numbers" id="exhaustfan-status"></div>
+                    <div class="cardName">Exhaust Fan</div>
+                </div>
+                <div class="iconBx">
+                    <img class="x-fan-btn" id="exhaustfan" src="{{ url_for('static', filename='imgs/exhaust-fan.png') }}" alt="Exhaust Fan">
+                </div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart">
+                <h2>Temperature</h2>
+                <div>
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart">
+                <h2>Humidity</h2>
+                <div>
+                    <canvas id="lineChart1"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="EnviTable">
             <table id="table-body2" border="1">
-            <thead>
-                <tr>
-                    <th>DateTime</th>
-                    <th>Humidity</th>
-                    <th>Temperature</th>
-                    <th>Light 1</th>
-                    <th>Light 2</th>
-                    <th>Ammonia</th>
-                    <th>ExhaustFan</th>
-                </tr>
-            </thead>
-            <tbody>
-            <!-- Table data will be dynamically loaded here -->
-            </tbody>
+                <thead>
+                    <tr>
+                        <th>DateTime</th>
+                        <th>Humidity</th>
+                        <th>Temperature</th>
+                        <th>Light 1</th>
+                        <th>Light 2</th>
+                        <th>Ammonia</th>
+                        <th>ExhaustFan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table data will be dynamically loaded here -->
+                </tbody>
             </table>
         </div>
 
-
-            </div>
-
-
-
-        </div>
     </div>
+</div>
 
-    <!-- =========== Scripts =========  -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- =========== Scripts =========  -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <!-- ====== ionicons ======= -->
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<!-- ====== ionicons ======= -->
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 
 </body>
 </html>
