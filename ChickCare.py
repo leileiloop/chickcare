@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, session, flash, url_for, redirect
+from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import os
 import psycopg2
 import psycopg2.extras
@@ -7,7 +7,7 @@ import psycopg2.extras
 # App Config
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Use env var in production
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")  # Change in production
 
 # -------------------------
 # PostgreSQL DB Config
@@ -170,10 +170,7 @@ def logout():
 # -------------------------
 def list_shots():
     shots_dir = os.path.join(app.static_folder, "shots")
-    try:
-        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
-    except FileNotFoundError:
-        return []
+    return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))] if os.path.exists(shots_dir) else []
 
 @app.route("/dashboard")
 def dashboard():
@@ -195,41 +192,30 @@ def dashboard():
         data=dict(latest_sensor) if latest_sensor else None
     )
 
-@app.route("/main_dashboard")
-def main_dashboard(): return render_template("main-dashboard.html")
-@app.route("/admin_dashboard")
-def admin_dashboard(): return render_template("admin-dashboard.html")
-@app.route("/manage_users")
-def manage_users(): return render_template("manage-users.html")
-@app.route("/report")
-def report(): return render_template("report.html")
+# Example additional pages
+@app.route("/main_dashboard")       def main_dashboard(): return render_template("main-dashboard.html")
+@app.route("/admin_dashboard")      def admin_dashboard(): return render_template("admin-dashboard.html")
+@app.route("/manage_users")         def manage_users(): return render_template("manage-users.html")
+@app.route("/report")               def report(): return render_template("report.html")
 
 # -------------------------
 # API Endpoints
 # -------------------------
-@app.route("/get_image_list")
-def get_image_list(): return jsonify(list_shots())
+@app.route("/get_image_list")       def get_image_list(): return jsonify(list_shots())
 
 @app.route("/get_data")
 def get_data():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan 
-                FROM sensordata ORDER BY DateTime DESC LIMIT 1
-            """)
+            cur.execute("SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan FROM sensordata ORDER BY DateTime DESC LIMIT 1")
             row = cur.fetchone()
-    if row: return jsonify(dict(row))
-    return jsonify({"error": "No data found"}), 404
+    return jsonify(dict(row)) if row else jsonify({"error": "No data found"}), 404
 
 @app.route("/get_all_data")
 def get_all_data():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan 
-                FROM sensordata ORDER BY DateTime DESC LIMIT 10
-            """)
+            cur.execute("SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan FROM sensordata ORDER BY DateTime DESC LIMIT 10")
             rows = [dict(r) for r in cur.fetchall()]
     return jsonify(rows)
 
@@ -252,64 +238,6 @@ def insert_notifications():
             for msg in items:
                 cur.execute("INSERT INTO notifications (message) VALUES (%s)", (msg,))
     return jsonify({"success": True, "inserted": len(items)})
-
-@app.route("/update_user", methods=["POST"])
-def update_user():
-    data = request.get_json() or {}
-    user_id = data.get("id")
-    if not user_id: return jsonify({"success": False, "message": "id required"}), 400
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET Email=%s, Username=%s, Password=%s WHERE id=%s",
-                (data.get("email"), data.get("username"), data.get("password"), user_id)
-            )
-    return jsonify({"success": True})
-
-@app.route("/delete_user", methods=["POST"])
-def delete_user():
-    user_id = request.get_json().get("id")
-    if not user_id: return jsonify({"success": False, "message": "id required"}), 400
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
-    return jsonify({"success": True})
-
-@app.route("/get_filtered_data")
-def get_filtered_data():
-    record_type = request.args.get("recordType", "notifications")
-    from_date = request.args.get("fromDate")
-    to_date = request.args.get("toDate")
-    search = request.args.get("search")
-
-    table_map = {
-        "notifications": "notifications",
-        "supplies": "sensordata1",
-        "environment": "sensordata",
-        "growth": "sensordata3",
-        "sanitization": "sensordata2"
-    }
-    table = table_map.get(record_type, "notifications")
-    sql = f"SELECT * FROM {table}"
-    params, where = [], []
-
-    if from_date and to_date:
-        where.append("DateTime BETWEEN %s AND %s")
-        params.extend([from_date + " 00:00:00", to_date + " 23:59:59"])
-    if search:
-        where.append("message LIKE %s")
-        params.append(f"%{search}%")
-    if where: sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY DateTime DESC LIMIT 700"
-
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
-                rows = [dict(r) for r in cur.fetchall()]
-        return jsonify(rows)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 # -------------------------
 # Health Check
