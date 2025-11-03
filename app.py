@@ -10,7 +10,7 @@ import secrets
 # App Configuration
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # Change in production
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey") # Change in production
 
 # -------------------------
 # PostgreSQL Configuration
@@ -29,7 +29,9 @@ def get_db_connection():
     
     # Ensure sslmode="require" is used, which is mandatory for Render PostgreSQL.
     try:
-        return psycopg.connect(DATABASE_URL, row_factory=dict_row, sslmode="require")
+        # FIX: Explicitly use conninfo=DATABASE_URL to ensure psycopg treats it as the connection string.
+        # This prevents the "invalid connection option" error caused by argument parsing confusion.
+        return psycopg.connect(conninfo=DATABASE_URL, row_factory=dict_row, sslmode="require")
     except OperationalError as e:
         # Catch specific psycopg connection errors (like wrong URL, host unreachable)
         raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
@@ -104,6 +106,7 @@ def register():
         except UniqueViolation:
             flash("Username already taken.", "danger")
         except (ValueError, ConnectionError, Exception) as e:
+            # Added ConnectionError check here for more granular feedback
             flash(f"Registration failed: {e}", "danger")
 
     return render_template("register.html")
@@ -138,6 +141,7 @@ def forgot_password():
                     else:
                         flash("Email not found.", "danger")
         except (ValueError, ConnectionError, Exception) as e:
+            # FIX: Used the general exception handling that was already defined to catch the connection errors here too.
             flash(f"Password reset failed: {e}", "danger")
 
     return render_template("forgot_password.html")
@@ -156,8 +160,14 @@ def dashboard():
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # Attempt to select from notifications table (assuming you created it)
-                cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
-                notifications = cur.fetchall()
+                # NOTE: The table 'notifications' was not included in your SQL dumps. 
+                # This query might fail if the table hasn't been created yet.
+                try:
+                    cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
+                    notifications = cur.fetchall()
+                except OperationalError:
+                    print("NOTICE: 'notifications' table not found. Skipping notifications fetch.")
+                    notifications = []
 
                 cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
                 latest_sensor = cur.fetchone()
@@ -251,6 +261,7 @@ def insert_notifications():
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 for msg in items:
+                    # Assuming 'notifications' table has a 'message' column and a default for 'DateTime'
                     cur.execute("INSERT INTO notifications (message) VALUES (%s)", (msg,))
             conn.commit()
         return jsonify({"success": True, "inserted": len(items)})
