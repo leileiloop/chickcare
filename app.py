@@ -6,6 +6,9 @@ from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation, OperationalError
 from flask import Flask, render_template, request, session, flash, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # -------------------------
 # App Configuration
@@ -23,6 +26,39 @@ def get_db_connection():
         return psycopg.connect(DATABASE_URL, row_factory=dict_row)
     except OperationalError as e:
         raise ConnectionError(f"Database connection failed: {e}")
+
+# -------------------------
+# Email Configuration
+# -------------------------
+GMAIL_USER = "chickenmonitor1208@gmail.com"
+GMAIL_PASSWORD = "leinadloki012"  # use env variable in production
+
+def send_reset_email(to_email, token):
+    reset_link = f"http://localhost:8080/reset_password/{token}"  # replace with your domain
+    subject = "Password Reset Instructions"
+    body = f"""
+    Hi,
+
+    You requested a password reset. Click the link below to reset your password:
+
+    {reset_link}
+
+    If you did not request this, ignore this email.
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = GMAIL_USER
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASSWORD)
+            server.send_message(msg)
+        print(f"Password reset email sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 # -------------------------
 # Decorators
@@ -62,7 +98,6 @@ def login():
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
                             session.clear()
-                            # Use role from DB if exists, default to "user"
                             session["user_role"] = user.get("role", "user")
                             session["email"] = user["Email"]
                             flash("Login successful.", "success")
@@ -140,11 +175,12 @@ def forgot_password():
                         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
-                        flash("Reset token generated. Enter a new password.", "success")
-                        return redirect(url_for("reset_password", token=token))
-                    else:
-                        flash("If registered, password reset instructions sent.", "info")
-                        return redirect(url_for("login"))
+                        send_reset_email(email, token)
+
+                    # Always show generic message
+                    flash("If registered, password reset instructions have been sent to your email.", "info")
+            return redirect(url_for("login"))
+
         except Exception as e:
             flash(f"Failed to process password reset: {e}", "danger")
             return redirect(url_for("forgot_password"))
