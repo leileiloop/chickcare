@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login | Dan Aleko</title>
+  <title>Login & Reset | Dan Aleko</title>
 
   <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-  
   <!-- Poppins Font -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -21,7 +20,7 @@
     .wrapper {
       width: 420px; max-width: 100%;
       background: transparent;
-      border: 2px solid rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, .2);
       backdrop-filter: blur(60px);
       color: #fff;
       border-radius: 12px;
@@ -29,11 +28,11 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
     }
     h1 { text-align: center; font-size: 36px; margin-bottom: 20px; }
-    .input-box { position: relative; width: 100%; height: 50px; margin: 20px 0; }
+    .input-box { position: relative; width: 100%; height: 50px; margin: 30px 0; }
     .input-box input {
       width: 100%; height: 100%;
       background: transparent; border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 40px; padding: 0 45px 0 20px;
+      border-radius: 40px; padding: 20px 45px 20px 20px;
       font-size: 16px; color: #fff; outline: none;
     }
     .input-box input::placeholder { color: rgba(255,255,255,0.7); }
@@ -44,17 +43,22 @@
       transition: background 0.3s;
     }
     .btn:hover { background: #eee; }
+    .btn-yellow { background: #ffcc00; color: #1f2937; }
+    .btn-yellow:hover { background: #ffdb4d; }
 
-    .remember-forgot { display: flex; justify-content: space-between; font-size: 14.5px; margin: -10px 0 15px; }
+    .remember-forgot { display: flex; justify-content: space-between; font-size: 14.5px; margin: -15px 0 15px; }
     .remember-forgot label input { accent-color: #fff; margin-right: 3px; }
     .remember-forgot a { color: #fff; text-decoration: none; }
     .remember-forgot a:hover { text-decoration: underline; }
 
-    .register-link { font-size: 14.5px; text-align: center; margin: 20px 0 0; }
-    .register-link p a { color: #ffcc00; font-weight: 600; text-decoration: none; }
-    .register-link p a:hover { text-decoration: underline; }
+    .register-link, .forgot-link { font-size: 14.5px; text-align: center; margin: 20px 0 15px; }
+    .register-link p a, .forgot-link p a { color: #ffcc00; font-weight: 600; text-decoration: none; }
+    .register-link p a:hover, .forgot-link p a:hover { text-decoration: underline; }
+    .info-text { text-align: center; font-size: 14px; color: rgba(255,255,255,0.8); margin-bottom: 20px; }
 
-    /* Flask Flash Messages */
+    .hidden { display: none !important; }
+
+    /* Flash Messages */
     .flash-message { padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 14px; font-weight: 500; color: #fff; }
     .flash-success { background-color: #10b981; border: 1px solid #047857; }
     .flash-danger { background-color: #ef4444; border: 1px solid #b91c1c; }
@@ -65,36 +69,90 @@
 
 <div class="wrapper">
 
-  <h1>Login</h1>
+  <!-- LOGIN FORM -->
+  <div id="loginForm" class="form-container">
+    <h1>Login</h1>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-  <form method="post" action="{{ url_for('login') }}">
-    <div class="input-box">
-      <input type="text" name="email" placeholder="Email" required>
-      <i class='bx bxs-user'></i>
-    </div>
-    <div class="input-box">
-      <input type="password" name="password" placeholder="Password" required>
-      <i class='bx bxs-lock-alt'></i>
-    </div>
-    <div class="remember-forgot">
-      <label><input type="checkbox" name="remember"> Remember me</label>
-      <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
-    </div>
-    <button type="submit" class="btn">Login</button>
-    <div class="register-link">
-      <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
-    </div>
-  </form>
+    <form method="post" action="{{ url_for('login') }}">
+      <div class="input-box">
+        <input type="text" name="email" placeholder="Email" required>
+        <i class='bx bxs-user'></i>
+      </div>
+      <div class="input-box">
+        <input type="password" name="password" placeholder="Password" required>
+        <i class='bx bxs-lock-alt'></i>
+      </div>
+      <div class="remember-forgot">
+        <label><input type="checkbox" name="remember"> Remember me</label>
+        <a href="#" id="showForgot">Forgot Password?</a>
+      </div>
+      <button type="submit" class="btn">Login</button>
+      <div class="register-link">
+        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+      </div>
+    </form>
+  </div>
+
+  <!-- FORGOT PASSWORD FORM -->
+  <div id="forgotForm" class="form-container hidden">
+    <h1>Reset Password</h1>
+    <p class="info-text">Enter your email to receive a password reset link.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('forgot_password') }}">
+      <div class="input-box">
+        <input type="email" name="email" placeholder="Email Address" required>
+        <i class='bx bxs-envelope'></i>
+      </div>
+      <button type="submit" class="btn btn-yellow">Send Reset Link</button>
+
+      <div class="forgot-link">
+        <p>Remembered your password? <a href="#" id="showLogin">Back to Login</a></p>
+        <p>Need an account? <a href="{{ url_for('register') }}">Register</a></p>
+      </div>
+    </form>
+  </div>
 
 </div>
+
+<script>
+  const loginForm = document.getElementById('loginForm');
+  const forgotForm = document.getElementById('forgotForm');
+  document.getElementById('showForgot').addEventListener('click', e => {
+    e.preventDefault();
+    loginForm.classList.add('hidden');
+    forgotForm.classList.remove('hidden');
+  });
+  document.getElementById('showLogin').addEventListener('click', e => {
+    e.preventDefault();
+    forgotForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+  });
+
+  // Optionally show forgot form if redirected to forgot route
+  window.onload = function() {
+    const path = window.location.pathname;
+    if(path.includes('forgot')) {
+      loginForm.classList.add('hidden');
+      forgotForm.classList.remove('hidden');
+    }
+  };
+</script>
 
 </body>
 </html>
