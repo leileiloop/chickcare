@@ -33,6 +33,16 @@
     .form-input::placeholder {
         color: rgba(255, 255, 255, 0.7);
     }
+    /* ADDED STYLES FOR FLASK FLASH MESSAGES */
+    .flash-success {
+        background-color: #10b981; /* emerald-500 */
+    }
+    .flash-danger {
+        background-color: #ef4444; /* red-500 */
+    }
+    .flash-warning {
+        background-color: #f59e0b; /* amber-500 */
+    }
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -44,12 +54,20 @@
     <div id="loginForm" class="form-container">
       <h1 class="text-3xl font-extrabold text-center mb-8">Login</h1>
 
-      <!-- Placeholder for Flash Messages (Error/Success) -->
-      <div id="flash-message-container-login" class="mb-4">
-          <!-- Server-side messages for login errors/success -->
-      </div>
+      <!-- START: Flask Flash Message Logic -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <!-- Note: category is like 'success', 'danger', 'warning' -->
+                <div class="p-3 mb-4 rounded-lg text-sm font-medium {{ 'flash-' + category }} text-white">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <!-- END: Flask Flash Message Logic -->
 
-      <form method="post" action="/login">
+      <form method="post" action="{{ url_for('login') }}">
         <!-- Username Input -->
         <div class="input-box-container mb-6">
           <input
@@ -96,7 +114,7 @@
         <!-- Register Link -->
         <div class="text-center text-sm mt-6">
           <p>Don't have an account?
-            <a href="/register" class="text-yellow-300 font-semibold hover:underline transition duration-200">
+            <a href="{{ url_for('register') }}" class="text-yellow-300 font-semibold hover:underline transition duration-200">
               Register
             </a>
           </p>
@@ -111,12 +129,20 @@
           Enter your email to receive a password reset link.
       </p>
 
-      <!-- Placeholder for Flash Messages (Error/Success) -->
-      <div id="flash-message-container-forgot" class="mb-4">
-          <!-- Server-side messages for reset success/errors -->
-      </div>
+      <!-- START: Flask Flash Message Logic for Forgot Password -->
+      <!-- We re-display the flash messages here in case Flask redirects back to the forgot_password route -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="p-3 mb-4 rounded-lg text-sm font-medium {{ 'flash-' + category }} text-white">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <!-- END: Flask Flash Message Logic -->
 
-      <form method="post" action="/forgot_password">
+      <form method="post" action="{{ url_for('forgot_password') }}">
         <!-- Email Input -->
         <div class="input-box-container mb-6">
           <input
@@ -140,12 +166,13 @@
         <!-- Back to Login/Register Links -->
         <div class="text-center text-sm mt-6 space-y-2">
           <p>Remembered your password?
+            <!-- This is the JavaScript client-side switch -->
             <a href="#" id="showLoginFromForgot" class="text-yellow-300 font-semibold hover:underline transition duration-200">
               Back to Login
             </a>
           </p>
           <p>Need an account?
-            <a href="/register" class="text-white/80 font-semibold hover:underline transition duration-200">
+            <a href="{{ url_for('register') }}" class="text-white/80 font-semibold hover:underline transition duration-200">
               Register
             </a>
           </p>
@@ -187,9 +214,14 @@
         showForm('login');
     });
 
-    // Optional: Check URL parameters or server-side state to pre-show the Forgot Password form
-    // if a reset attempt failed or was requested on load.
-    // Example: if (window.location.search.includes('reset=true')) { showForm('forgot'); }
+    // Determine which form to show on page load based on the route or flash messages
+    window.onload = function() {
+        const urlPath = window.location.pathname;
+        if (urlPath.includes('forgot_password')) {
+            // If the user was redirected to forgot_password (e.g., if submission failed)
+            showForm('forgot');
+        }
+    };
 
   </script>
 </body>
