@@ -8,7 +8,6 @@ from flask import Flask, render_template, request, session, flash, redirect, url
 from werkzeug.security import generate_password_hash, check_password_hash
 import smtplib
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 # -------------------------
 # App Configuration
@@ -28,39 +27,6 @@ def get_db_connection():
         raise ConnectionError(f"Database connection failed: {e}")
 
 # -------------------------
-# Email Configuration
-# -------------------------
-GMAIL_USER = "chickenmonitor1208@gmail.com"
-GMAIL_PASSWORD = "leinadloki012"  # use env variable in production
-
-def send_reset_email(to_email, token):
-    reset_link = f"http://localhost:8080/reset_password/{token}"  # replace with your domain
-    subject = "Password Reset Instructions"
-    body = f"""
-    Hi,
-
-    You requested a password reset. Click the link below to reset your password:
-
-    {reset_link}
-
-    If you did not request this, ignore this email.
-    """
-
-    msg = MIMEMultipart()
-    msg['From'] = GMAIL_USER
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.send_message(msg)
-        print(f"Password reset email sent to {to_email}")
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-
-# -------------------------
 # Decorators
 # -------------------------
 def login_required(role=None):
@@ -76,6 +42,57 @@ def login_required(role=None):
             return view(**kwargs)
         return wrapped_view
     return decorator
+
+# -------------------------
+# Super Admin Creation
+# -------------------------
+def create_admin_user():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
+                cur.execute("SELECT * FROM users WHERE Username=%s", ("admin",))
+                admin_user = cur.fetchone()
+                if not admin_user:
+                    hashed = generate_password_hash("admin")
+                    cur.execute(
+                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
+                        ("admin@example.com", "admin", hashed, "admin")
+                    )
+                    conn.commit()
+                    print("Super admin account created: admin/admin")
+                else:
+                    print("Super admin already exists.")
+    except Exception as e:
+        print(f"Failed to create super admin: {e}")
+
+create_admin_user()
+
+# -------------------------
+# Email Config for Password Reset
+# -------------------------
+SMTP_EMAIL = "chickenmonitor1208@gmail.com"
+SMTP_PASSWORD = "leinadloki012"
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+
+def send_reset_email(to_email, token):
+    reset_link = f"http://127.0.0.1:8080/reset_password/{token}"
+    subject = "Password Reset Request"
+    body = f"Click the link to reset your password:\n\n{reset_link}"
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = SMTP_EMAIL
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.sendmail(SMTP_EMAIL, to_email, msg.as_string())
+            print(f"Reset email sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send reset email: {e}")
 
 # -------------------------
 # Authentication Routes
@@ -107,7 +124,6 @@ def login():
             except Exception as e:
                 error = f"Login failed: {e}"
                 print(f"LOGIN ERROR: {e}")
-
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -125,15 +141,12 @@ def register():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Ensure role column exists
-                    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
                     cur.execute(
                         "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
                         (email, username, hashed, "user")
                     )
                 conn.commit()
 
-            # Auto login after registration
             session.clear()
             session["user_role"] = "user"
             session["email"] = email
@@ -176,11 +189,11 @@ def forgot_password():
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
                         send_reset_email(email, token)
-
-                    # Always show generic message
-                    flash("If registered, password reset instructions have been sent to your email.", "info")
-            return redirect(url_for("login"))
-
+                        flash("Password reset link sent! Check your email.", "success")
+                        return redirect(url_for("login"))
+                    else:
+                        flash("If registered, password reset instructions sent.", "info")
+                        return redirect(url_for("login"))
         except Exception as e:
             flash(f"Failed to process password reset: {e}", "danger")
             return redirect(url_for("forgot_password"))
