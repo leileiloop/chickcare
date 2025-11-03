@@ -4,7 +4,7 @@ import functools
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation, OperationalError
-from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
+from flask import Flask, render_template, request, session, flash, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # -------------------------
@@ -27,14 +27,19 @@ def get_db_connection():
 # -------------------------
 # Decorators
 # -------------------------
-def login_required(view):
-    @functools.wraps(view)
-    def wrapped_view(**kwargs):
-        if "user_role" not in session:
-            flash("You must log in first.", "warning")
-            return redirect(url_for("login"))
-        return view(**kwargs)
-    return wrapped_view
+def login_required(role=None):
+    def decorator(view):
+        @functools.wraps(view)
+        def wrapped_view(**kwargs):
+            if "user_role" not in session:
+                flash("You must log in first.", "warning")
+                return redirect(url_for("login"))
+            if role and session.get("user_role") != role:
+                flash("Access denied.", "danger")
+                return redirect(url_for("login"))
+            return view(**kwargs)
+        return wrapped_view
+    return decorator
 
 # -------------------------
 # Authentication Routes
@@ -42,21 +47,13 @@ def login_required(view):
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Always clear old session when visiting login page
-    session.clear()
     error = None
-
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
 
         if not username or not password:
             error = "Provide username and password."
-        elif username.lower() == "admin" and password == "admin":
-            session["user_role"] = "admin"
-            session["email"] = "admin@domain.com"
-            flash("Admin logged in.", "success")
-            return redirect(url_for("dashboard"))
         else:
             try:
                 with get_db_connection() as conn:
@@ -64,10 +61,11 @@ def login():
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
-                            session["user_role"] = "user"
+                            session.clear()
+                            session["user_role"] = "admin" if username.lower() == "admin" else "user"
                             session["email"] = user["Email"]
                             flash("Login successful.", "success")
-                            return redirect(url_for("dashboard"))
+                            return redirect(url_for("admin_dashboard") if session["user_role"]=="admin" else url_for("dashboard"))
                         else:
                             error = "Invalid credentials."
             except Exception as e:
@@ -113,7 +111,7 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
-# Forgot Password Routes
+# Password Reset Routes
 # -------------------------
 @app.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
@@ -130,7 +128,6 @@ def forgot_password():
                     user = cur.fetchone()
                     if user:
                         token = secrets.token_urlsafe(16)
-                        # Ensure column exists
                         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
@@ -160,10 +157,7 @@ def reset_password(token):
                     user = cur.fetchone()
                     if user:
                         hashed = generate_password_hash(new_password)
-                        cur.execute(
-                            "UPDATE users SET Password=%s, reset_token=NULL WHERE reset_token=%s",
-                            (hashed, token)
-                        )
+                        cur.execute("UPDATE users SET Password=%s, reset_token=NULL WHERE reset_token=%s", (hashed, token))
                         conn.commit()
                         flash("Password updated successfully. Please login.", "success")
                         return redirect(url_for("login"))
@@ -177,17 +171,16 @@ def reset_password(token):
     return render_template("reset_password.html", token=token)
 
 # -------------------------
-# Dashboard
+# User Dashboard
 # -------------------------
 @app.route("/dashboard")
-@login_required
+@login_required(role="user")
 def dashboard():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 10")
                 env_data = cur.fetchall()
-
                 cur.execute("SELECT * FROM sensordata4 ORDER BY DateTime DESC LIMIT 10")
                 water_food_data = cur.fetchall()
     except Exception as e:
@@ -196,6 +189,29 @@ def dashboard():
         water_food_data = []
 
     return render_template("dashboard.html", env_data=env_data, water_food_data=water_food_data)
+
+# -------------------------
+# Admin Dashboard
+# -------------------------
+@app.route("/admin_dashboard")
+@login_required(role="admin")
+def admin_dashboard():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, Email, Username FROM users ORDER BY id")
+                users = cur.fetchall()
+                cur.execute("""
+                    SELECT DateTime, CONCAT('Water:', Water_Level, ' Food:', Food_Level) AS message
+                    FROM sensordata4 ORDER BY DateTime DESC LIMIT 10
+                """)
+                notifications = cur.fetchall()
+    except Exception as e:
+        flash(f"Error loading admin dashboard: {e}", "danger")
+        users = []
+        notifications = []
+
+    return render_template("admin_dashboard.html", users=users, notifications=notifications)
 
 # -------------------------
 # Main Entry
