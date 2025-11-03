@@ -22,7 +22,7 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      /* FIX: Using the Flask url_for for the background image, consistent with the register form */
+      /* Using the Flask url_for for the background image, consistent with the register form */
       background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat;
       background-size: cover;
       background-position: center;
@@ -151,6 +151,11 @@
     .flash-success { background-color: #10b981; border: 1px solid #047857; }
     .flash-danger { background-color: #ef4444; border: 1px solid #b91c1c; }
     .flash-warning { background-color: #f59e0b; border: 1px solid #d97706; }
+
+    /* Essential class for the JavaScript form toggling */
+    .hidden {
+        display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -203,6 +208,7 @@
             <input type="checkbox" name="remember">
             Remember me
           </label>
+          <!-- CHANGE: Reverting to client-side toggle for single-page experience -->
           <a href="#" id="showForgotPassword">
             Forgot Password?
           </a>
@@ -227,7 +233,7 @@
       </form>
     </div>
 
-    <!-- FORGOT PASSWORD FORM (Hidden by Default) -->
+    <!-- FORGOT PASSWORD FORM (Initially Hidden) -->
     <div id="forgotPasswordForm" class="form-container hidden">
       <h1>Reset Password</h1>
       <p class="forgot-info">
@@ -306,26 +312,26 @@
         }
     }
 
-    // Event listeners to switch forms
+    // Event listener to switch from login to forgot (client-side)
     showForgotPasswordLink.addEventListener('click', (e) => {
         e.preventDefault();
         showForm('forgot');
     });
 
+    // Event listener to switch from forgot form back to login form (client-side for snappy UX)
     showLoginFromForgotLink.addEventListener('click', (e) => {
         e.preventDefault();
         showForm('login');
     });
 
-    // Determine which form to show on page load based on the route or flash messages
+    // We retain the URL check here only to handle backend redirects (like failed form submissions)
+    // where the server might redirect to a URL containing 'forgot_password' but render this template.
     window.onload = function() {
         const urlPath = window.location.pathname;
         if (urlPath.includes('forgot_password')) {
-            // If the user was redirected to forgot_password (e.g., if submission failed)
             showForm('forgot');
         }
     };
-
   </script>
 </body>
 </html>
