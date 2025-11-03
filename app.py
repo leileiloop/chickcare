@@ -16,20 +16,16 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = "postgresql://chickencaredb_tnrw_user:S5Bb7GdOT6zDwYZy8uJrI762A8aq7nG4@dpg-d447gopr0fns73fssg5g-a.oregon-postgres.render.com/chickencaredb_tnrw"
 
 def get_db_connection():
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL is not set.")
-    conn_str = DATABASE_URL
-    if conn_str.startswith("postgres://"):
-        conn_str = conn_str.replace("postgres://", "postgresql://", 1)
-    if "sslmode" not in conn_str:
-        conn_str += "&sslmode=require" if "?" in conn_str else "?sslmode=require"
-    return psycopg.connect(conn_str, row_factory=dict_row)
+    try:
+        return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    except OperationalError as e:
+        raise ConnectionError(f"Database connection failed: {e}")
 
 # -------------------------
-# Utility Decorators
+# Decorators
 # -------------------------
 def login_required(view):
     @functools.wraps(view)
@@ -41,52 +37,52 @@ def login_required(view):
     return wrapped_view
 
 # -------------------------
-# Auth Routes
+# Utility Functions
+# -------------------------
+def list_shots():
+    shots_dir = os.path.join(app.static_folder, "shots")
+    if os.path.exists(shots_dir):
+        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
+    return []
+
+# -------------------------
+# Authentication Routes
 # -------------------------
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Redirect already logged-in users
-    if "user_role" in session:
-        role = session.get("user_role")
-        if role == "admin":
-            return redirect(url_for("admin_dashboard"))
-        return redirect(url_for("dashboard"))
-
+    error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        if not username or not password:
-            flash("Provide username and password.", "warning")
-            return redirect(url_for("login"))
 
-        # Admin login
-        if username.lower() == "admin" and password == "admin":
+        if not username or not password:
+            error = "Provide username and password."
+        elif username.lower() == "admin" and password == "admin":
             session.clear()
             session["user_role"] = "admin"
             session["email"] = "admin@domain.com"
             flash("Admin logged in.", "success")
-            return redirect(url_for("admin_dashboard"))
+            return redirect(url_for("dashboard"))
+        else:
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
+                        user = cur.fetchone()
+                        if user and check_password_hash(user["Password"], password):
+                            session.clear()
+                            session["user_role"] = "user"
+                            session["email"] = user["Email"]
+                            flash("Login successful.", "success")
+                            return redirect(url_for("dashboard"))
+                        else:
+                            error = "Invalid credentials."
+            except Exception as e:
+                error = f"Login failed: {e}"
+                print(f"LOGIN ERROR: {e}")
 
-        # Regular user login
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
-                    user = cur.fetchone()
-                    if user and check_password_hash(user["Password"], password):
-                        session.clear()
-                        session["user_role"] = "user"
-                        session["email"] = user["Email"]
-                        flash("Login successful.", "success")
-                        return redirect(url_for("dashboard"))
-                    else:
-                        flash("Invalid credentials.", "danger")
-        except Exception as e:
-            flash(f"Login failed: {e}", "danger")
-            print(f"LOGIN ERROR: {e}")
-
-    return render_template("login.html")
+    return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -103,7 +99,10 @@ def register():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)", (email, username, hashed))
+                    cur.execute(
+                        "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
+                        (email, username, hashed)
+                    )
                 conn.commit()
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
@@ -118,9 +117,12 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("Logged out successfully.", "info")
+    flash("Logged out.", "info")
     return redirect(url_for("login"))
 
+# -------------------------
+# Forgot Password Routes
+# -------------------------
 @app.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
@@ -135,35 +137,61 @@ def forgot_password():
                     cur.execute("SELECT * FROM users WHERE Email=%s", (email,))
                     user = cur.fetchone()
                     if user:
-                        temp_pass = secrets.token_urlsafe(8)
-                        hashed = generate_password_hash(temp_pass)
-                        cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (hashed, email))
+                        token = secrets.token_urlsafe(16)
+                        cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
-                        flash(f"Temporary password: {temp_pass}", "success")  # Replace with real email in production
-                        return redirect(url_for("login"))
+                        flash("Reset token generated. Please enter a new password.", "success")
+                        return redirect(url_for("reset_password", token=token))
                     else:
-                        flash("If registered, password reset sent.", "success")
+                        flash("If registered, password reset instructions sent.", "info")
                         return redirect(url_for("login"))
         except Exception as e:
-            flash(f"Password reset failed: {e}", "danger")
+            flash(f"Failed to process password reset: {e}", "danger")
             return redirect(url_for("forgot_password"))
 
     return render_template("forgot_password.html")
 
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if request.method == "POST":
+        new_password = request.form.get("password", "").strip()
+        if not new_password:
+            flash("Enter a new password.", "warning")
+            return redirect(url_for("reset_password", token=token))
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE reset_token=%s", (token,))
+                    user = cur.fetchone()
+                    if user:
+                        hashed = generate_password_hash(new_password)
+                        cur.execute(
+                            "UPDATE users SET Password=%s, reset_token=NULL WHERE reset_token=%s",
+                            (hashed, token)
+                        )
+                        conn.commit()
+                        flash("Password updated successfully. Please login.", "success")
+                        return redirect(url_for("login"))
+                    else:
+                        flash("Invalid or expired token.", "danger")
+                        return redirect(url_for("forgot_password"))
+        except Exception as e:
+            flash(f"Failed to reset password: {e}", "danger")
+            return redirect(url_for("forgot_password"))
+
+    return render_template("reset_password.html")
+
 # -------------------------
-# Dashboard Routes
+# Dashboard
 # -------------------------
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    if session.get("user_role") == "admin":
-        return redirect(url_for("admin_dashboard"))
     return render_template("dashboard.html")
 
-@app.route("/admin_dashboard")
-@login_required
-def admin_dashboard():
-    if session.get("user_role") != "admin":
-        flash("Admin only.", "danger")
-        return redirect(url_for("dashboard"))
-    return render_template("admin-dashboard.html")
+# -------------------------
+# Main Entry
+# -------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
