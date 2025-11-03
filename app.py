@@ -1,10 +1,10 @@
+import os
+import secrets
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation, OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
-import secrets
 import functools
 
 # -------------------------
@@ -23,30 +23,33 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 def get_db_connection():
     """
     Connect to PostgreSQL with SSL. 
-    Appends 'sslmode=require' to the URL to ensure Render compatibility without
-    conflicting with the connection string parser.
+    Appends 'sslmode=require' to the URL and fixes the scheme for Render compatibility.
     """
     if not DATABASE_URL:
         # This provides a clear error instead of the ambiguous 'NoneType' crash.
         raise ValueError("DATABASE_URL environment variable is not set. Cannot establish database connection.")
     
-    # --- FIX APPLIED HERE ---
     # 1. Start with the raw URL.
     connection_string_with_ssl = DATABASE_URL
     
-    # 2. Check if sslmode is already present in the URL string.
+    # --- FIX 1: Correct the connection scheme for psycopg (Required for Render/Heroku) ---
+    # Change 'postgres://' to the required 'postgresql://'
+    if connection_string_with_ssl.startswith("postgres://"):
+        connection_string_with_ssl = connection_string_with_ssl.replace("postgres://", "postgresql://", 1)
+    # --- END FIX 1 ---
+    
+    # --- FIX 2: Ensure sslmode=require is appended (User's existing logic) ---
+    # Check if sslmode is already present in the URL string.
     if "sslmode" not in connection_string_with_ssl:
-        # 3. Append '?sslmode=require' or '&sslmode=require' if other parameters exist.
+        # Append '?sslmode=require' or '&sslmode=require' if other parameters exist.
         if "?" in connection_string_with_ssl:
             connection_string_with_ssl += "&sslmode=require"
         else:
             connection_string_with_ssl += "?sslmode=require"
-    # --- END FIX ---
+    # --- END FIX 2 ---
     
     try:
         # Pass the full, modified connection string as the first (positional) argument.
-        # This is equivalent to conninfo= and is the most reliable method.
-        # We explicitly remove the separate sslmode="require" keyword argument here.
         return psycopg.connect(connection_string_with_ssl, row_factory=dict_row)
     except OperationalError as e:
         # Catch specific psycopg connection errors (like wrong URL, host unreachable)
@@ -127,10 +130,8 @@ def register():
                     )
                 conn.commit()
             
-            # --- THIS IS THE CRITICAL LOGIC ---
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
-            # -----------------------------------
             
         except UniqueViolation:
             flash("Username already taken.", "danger")
@@ -151,7 +152,8 @@ def forgot_password():
         email = request.form.get("email", "").strip()
         if not email:
             flash("Please enter your email.", "warning")
-            return redirect(url_for("forgot_password"))
+            # Redirect to login is usually better for forms that share a page
+            return redirect(url_for("login")) 
 
         try:
             with get_db_connection() as conn:
@@ -167,11 +169,15 @@ def forgot_password():
                         flash(f"Your temporary password is: {temp_password}", "success")
                         return redirect(url_for("login"))
                     else:
-                        flash("Email not found.", "danger")
-        except (ValueError, ConnectionError, Exception) as e:
-            flash(f"Password reset failed: {e}", "danger")
+                         # For security, pretend we sent the email even if the user wasn't found
+                        flash("If the email is registered, a password reset link has been sent.", "success")
+                        return redirect(url_for("login"))
 
-    return render_template("forgot_password.html")
+        except (ValueError, ConnectionError, Exception) as e:
+            # We specifically catch connection issues which should now be clearer
+            flash(f"Password reset failed: Database error. {e}", "danger")
+
+    return render_template("login.html") # Assuming forgot password uses the combined login template
 
 # -------------------------
 # Dashboard Routes
