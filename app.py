@@ -22,33 +22,30 @@ log = logging.getLogger("chickencare")
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
-app.config["SESSION_COOKIE_SECURE"] = False  # set True on HTTPS/production
+app.config["SESSION_COOKIE_SECURE"] = False  # set True on HTTPS in production
 
 # -------------------------
-# DATABASE (Render / Provided)
+# Database (use provided/default)
 # -------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL") or (
-    "postgresql://chickencaredb_tnrw_user:"
-    "S5Bb7GdOT6zDwYZy8uJrI762A8aq7nG4@"
-    "dpg-d447gopr0fns73fssg5g-a.oregon-postgres.render.com/"
-    "chickencaredb_tnrw"
+# Either take from environment or fall back to the provided Render URL
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://chickencaredb_tnrw_user:S5Bb7GdOT6zDwYZy8uJrI762A8aq7nG4@dpg-d447gopr0fns73fssg5g-a.oregon-postgres.render.com/chickencaredb_tnrw"
 )
 
 def get_db_connection():
-    """Return a new DB connection using psycopg with dict rows."""
+    """Return a new psycopg connection using dict-like rows."""
     try:
         return psycopg.connect(DATABASE_URL, row_factory=dict_row)
     except OperationalError as e:
-        log.exception("DB connect failed")
+        log.exception("Database connection failed")
         raise ConnectionError(f"Database connection failed: {e}")
 
 def normalize_row(row):
-    """
-    Convert dict_row keys to lower-case keys for robust access:
-    e.g. row['Password'] or row['password'] will be available as r['password'].
-    """
+    """Convert row keys to lowercase for consistent access (Password vs password)."""
     if row is None:
         return None
+    # dict_row already behaves like a dict; convert keys to lowercase
     return {k.lower(): v for k, v in dict(row).items()}
 
 # -------------------------
@@ -57,31 +54,37 @@ def normalize_row(row):
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "chickenmonitor1208@gmail.com")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "leinadloki012")  # use env var in production
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "leinadloki012")  # recommended: move to env var
 
 def send_reset_email(to_email: str, token: str) -> bool:
-    """
-    Send a password reset email containing a link to /reset_password/<token>.
-    _external True will create full URL based on request environment.
-    """
+    """Send an HTML password reset email. Returns True on success."""
     try:
         reset_link = url_for("reset_password", token=token, _external=True)
     except RuntimeError:
-        # url_for with _external requires request context; fallback to localhost link
+        # no request context (unlikely here) -> fallback to localhost
         reset_link = f"http://127.0.0.1:8080/reset_password/{token}"
 
-    subject = "ChickenCare — Password reset"
-    html = f"""
-    <html><body style="font-family: Arial, sans-serif;">
-      <p>Hello,</p>
-      <p>You requested a password reset for your ChickenCare account. Click below to reset:</p>
-      <p><a href="{reset_link}" style="padding:10px 20px;background:#1f8ceb;color:#fff;text-decoration:none;border-radius:6px;">Reset password</a></p>
-      <p>If you didn't request this, ignore this email.</p>
+    subject = "ChickenCare — Reset your password"
+    html_content = f"""
+    <html><body style="font-family:Arial, sans-serif;">
+      <h3>Password reset request</h3>
+      <p>Click the button below to reset your ChickenCare password:</p>
+      <p>
+        <a href="{reset_link}" style="
+            padding:10px 18px;
+            background:#1f8ceb;
+            color:#fff;
+            text-decoration:none;
+            border-radius:6px;
+            display:inline-block;">
+          Reset password
+        </a>
+      </p>
+      <p>If you didn't request this, you can ignore this message.</p>
       <p>— ChickenCare</p>
     </body></html>
     """
-
-    msg = MIMEText(html, "html")
+    msg = MIMEText(html_content, "html")
     msg["Subject"] = subject
     msg["From"] = SMTP_EMAIL
     msg["To"] = to_email
@@ -94,25 +97,28 @@ def send_reset_email(to_email: str, token: str) -> bool:
             server.sendmail(SMTP_EMAIL, [to_email], msg.as_string())
         log.info("Reset email sent to %s", to_email)
         return True
-    except Exception as e:
-        log.exception("Failed to send reset email")
+    except Exception:
+        log.exception("Failed to send reset email to %s", to_email)
         return False
 
 # -------------------------
-# DB initialization: add columns & ensure admin
+# Initialize DB schema & ensure super-admin
 # -------------------------
 def ensure_schema_and_admin():
-    """Add optional columns if missing and ensure default super-admin exists."""
+    """
+    Ensure optional columns exist and that a super-admin (username=admin) exists.
+    This runs at app startup.
+    """
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # add role and reset_token columns if they don't exist
+                # add optional columns if missing
                 cur.execute("""
                     ALTER TABLE users
                     ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user',
                     ADD COLUMN IF NOT EXISTS reset_token TEXT
                 """)
-                # create notifications table if not exist (optional helper)
+                # optionally create a notifications table if you wish to use it
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS notifications (
                         id SERIAL PRIMARY KEY,
@@ -120,24 +126,24 @@ def ensure_schema_and_admin():
                         message TEXT
                     )
                 """)
-                # ensure admin exists
+                # ensure admin user exists
                 cur.execute("SELECT id FROM users WHERE Username=%s", ("admin",))
                 if not cur.fetchone():
-                    hashed = generate_password_hash("admin")
+                    hashed_admin = generate_password_hash("admin")
                     cur.execute(
-                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s,%s,%s,%s)",
-                        ("admin@chickencare.local", "admin", hashed, "admin")
+                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
+                        ("admin@chickencare.local", "admin", hashed_admin, "admin")
                     )
-                    log.info("Default admin created (username=admin password=admin)")
+                    log.info("Default admin created (username=admin, password=admin)")
             conn.commit()
     except Exception:
-        log.exception("Failed to ensure schema/admin")
+        log.exception("Schema / admin initialization failed (continuing)")
 
-# run at import/start
+# run init at startup
 ensure_schema_and_admin()
 
 # -------------------------
-# Login decorator
+# login_required decorator with optional role
 # -------------------------
 def login_required(role=None):
     def decorator(view):
@@ -148,14 +154,14 @@ def login_required(role=None):
                 return redirect(url_for("login"))
             if role and session.get("user_role") != role:
                 flash("Access denied.", "danger")
-                # send to appropriate dashboard instead of login to avoid loops
+                # redirect to appropriate dashboard so user isn't trapped at login page
                 return redirect(url_for("dashboard") if session.get("user_role") == "user" else url_for("admin_dashboard"))
             return view(*args, **kwargs)
         return wrapped
     return decorator
 
 # -------------------------
-# Routes: login/register/logout
+# Routes: login, register, logout
 # -------------------------
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
@@ -164,8 +170,9 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+
         if not username or not password:
-            error = "Please enter username and password."
+            error = "Please enter both username and password."
         else:
             try:
                 with get_db_connection() as conn:
@@ -180,12 +187,16 @@ def login():
                             session["email"] = user.get("email")
                             session["username"] = user.get("username")
                             flash(f"Welcome, {session['username']}!", "success")
-                            return redirect(url_for("admin_dashboard") if session["user_role"] == "admin" else url_for("dashboard"))
+                            if session["user_role"] == "admin":
+                                return redirect(url_for("admin_dashboard"))
+                            else:
+                                return redirect(url_for("dashboard"))
                         else:
-                            error = "Invalid credentials."
+                            error = "Invalid username or password."
             except Exception:
                 log.exception("Login error")
                 error = "Login failed: server error."
+
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -194,16 +205,19 @@ def register():
         email = request.form.get("email", "").strip()
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+
         if not email or not username or not password:
             flash("All fields are required.", "warning")
             return redirect(url_for("register"))
 
-        hashed = generate_password_hash(password)
+        hashed_pw = generate_password_hash(password)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (Email, Username, Password, role) VALUES (%s,%s,%s,%s)",
-                                (email, username, hashed, "user"))
+                    cur.execute(
+                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
+                        (email, username, hashed_pw, "user")
+                    )
                 conn.commit()
             flash("Registration successful. Please log in.", "success")
             return redirect(url_for("login"))
@@ -217,11 +231,11 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("Logged out.", "info")
+    flash("You have logged out.", "info")
     return redirect(url_for("login"))
 
 # -------------------------
-# Password reset flow
+# Forgot / Reset password
 # -------------------------
 @app.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
@@ -230,29 +244,31 @@ def forgot_password():
         if not email:
             flash("Enter your email address.", "warning")
             return redirect(url_for("forgot_password"))
+
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT id FROM users WHERE Email=%s", (email,))
-                    user = cur.fetchone()
+                    user_exists = cur.fetchone() is not None
                     token = secrets.token_urlsafe(24)
-                    if user:
+                    if user_exists:
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
                         sent = send_reset_email(email, token)
                         if sent:
                             flash("Password reset email sent. Check your inbox.", "success")
                         else:
-                            # still show friendly message to avoid exposing whether email exists
-                            log.warning("Failed send_reset_email for %s", email)
-                            flash("Password reset email sent (if account exists). Check inbox.", "info")
+                            # don't reveal internal failure; show friendly message
+                            log.warning("send_reset_email failed for %s", email)
+                            flash("Password reset email sent (if the account exists). Check inbox.", "info")
                     else:
-                        # Friendly, non-confirming message
-                        flash("If the account exists, password reset instructions were sent.", "info")
+                        # Always show the same friendly message so you don't leak account existence
+                        flash("If the account exists, password reset instructions have been sent.", "info")
         except Exception:
             log.exception("Error in forgot_password")
             flash("Failed to process request: server error.", "danger")
         return redirect(url_for("login"))
+
     return render_template("forgot_password.html")
 
 @app.route("/reset_password/<token>", methods=["GET", "POST"])
@@ -280,7 +296,8 @@ def reset_password(token):
             log.exception("Error in reset_password")
             flash("Failed to reset password: server error.", "danger")
             return redirect(url_for("forgot_password"))
-    # GET -> show reset form
+
+    # GET -> render reset form (template should include a hidden token or use URL)
     return render_template("reset_password.html", token=token)
 
 # -------------------------
@@ -294,7 +311,8 @@ def dashboard():
             with conn.cursor() as cur:
                 cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
                 raw = cur.fetchall()
-                notifications = [normalize_row(r) for r in raw]
+                # normalize notification rows (lowercase keys) before passing to template
+                notifications = [{k.lower(): v for k, v in dict(r).items()} for r in raw]
     except Exception:
         log.exception("Dashboard load error")
         notifications = []
@@ -312,7 +330,7 @@ def admin_dashboard():
                 users = [normalize_row(u) for u in raw_users]
                 cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
                 raw_notifs = cur.fetchall()
-                notifications = [normalize_row(n) for n in raw_notifs]
+                notifications = [{k.lower(): v for k, v in dict(r).items()} for r in raw_notifs]
     except Exception:
         log.exception("Admin dashboard error")
         users, notifications = [], []
@@ -333,8 +351,7 @@ def health():
         return {"status": "error"}, 500
 
 # -------------------------
-# Run
+# Run (local)
 # -------------------------
 if __name__ == "__main__":
-    # When running locally: debug True. For production set DEBUG/ENV via env vars.
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
