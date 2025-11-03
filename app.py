@@ -62,7 +62,8 @@ def login():
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
                             session.clear()
-                            session["user_role"] = "admin" if username.lower() == "admin" else "user"
+                            # Use role from DB if exists, default to "user"
+                            session["user_role"] = user.get("role", "user")
                             session["email"] = user["Email"]
                             flash("Login successful.", "success")
                             return redirect(url_for("admin_dashboard") if session["user_role"]=="admin" else url_for("dashboard"))
@@ -90,12 +91,18 @@ def register():
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
-                        (email, username, hashed)
+                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
+                        (email, username, hashed, "user")  # default role
                     )
                 conn.commit()
-            flash("Registration successful. Please login.", "success")
-            return redirect(url_for("login"))
+
+            # Auto login after registration
+            session.clear()
+            session["user_role"] = "user"
+            session["email"] = email
+            flash("Registration successful. You are now logged in.", "success")
+            return redirect(url_for("dashboard"))
+
         except UniqueViolation:
             flash("Username or email already exists.", "danger")
         except Exception as e:
