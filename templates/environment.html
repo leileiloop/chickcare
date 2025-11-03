@@ -1,746 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chick Care Environment</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Chart.js for graphing -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <!-- Load Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, limit, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Set Firebase Log Level for debugging
-        setLogLevel('Debug');
-
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db = null;
-        let auth = null;
-        let userId = null;
-        let isAuthReady = false;
-
-        let currentStatusListener = null;
-        let historyListener = null;
-
-        // Configuration
-        const CURRENT_STATUS_PATH = `artifacts/${appId}/public/data/environment_status/current_status`;
-        const HISTORY_COLLECTION_PATH = `artifacts/${appId}/public/data/readings_history`;
-        const MAX_HISTORY_POINTS = 20;
-
-        // Chart instances
-        let tempChart = null;
-        let humidityChart = null;
-
-        // Helper function for UI updates
-        const getElement = (id) => document.getElementById(id);
-        const setHtml = (id, content) => getElement(id).innerHTML = content;
-        
-        // --- Firebase Initialization and Auth ---
-        window.initFirebase = async () => {
-            if (!firebaseConfig) {
-                console.error("Firebase config is missing.");
-                return;
-            }
-
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log("Authenticated user ID:", userId);
-                    } else {
-                        // Sign in anonymously if no token is available
-                        await signInAnonymously(auth);
-                        userId = auth.currentUser.uid;
-                        console.log("Signed in anonymously. User ID:", userId);
-                    }
-                    isAuthReady = true;
-                    setupListeners(); // Start listening after authentication
-                });
-                
-                // If custom token is available, try to use it first
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                }
-
-            } catch (error) {
-                console.error("Error initializing or authenticating Firebase:", error);
-                setHtml('hum', 'Error');
-                setHtml('temp', 'Error');
-                setHtml('amm', 'Error');
-            }
-        };
-
-        // --- Device Control Logic ---
-        window.toggleDevice = async (deviceId) => {
-            if (!db || !isAuthReady) {
-                console.warn("Database not ready yet.");
-                return;
-            }
-
-            const deviceEl = getElement(deviceId);
-            const statusEl = getElement(`${deviceId}-status`);
-            const currentStatus = deviceEl.dataset.status === 'ON';
-            const newStatus = !currentStatus;
-            
-            const statusText = newStatus ? 'ON' : 'OFF';
-            
-            // Optimistic UI update
-            deviceEl.dataset.status = statusText;
-            deviceEl.classList.toggle('brightness-150', newStatus);
-            statusEl.textContent = statusText;
-            
-            try {
-                const docRef = doc(db, CURRENT_STATUS_PATH);
-                const updateKey = `${deviceId.toLowerCase().replace('-', '_')}_on`;
-                
-                await setDoc(docRef, {
-                    [updateKey]: newStatus,
-                    last_updated: new Date().toISOString()
-                }, { merge: true });
-
-            } catch (e) {
-                console.error("Error toggling device:", e);
-                // Revert optimistic UI update on error
-                deviceEl.dataset.status = currentStatus ? 'ON' : 'OFF';
-                deviceEl.classList.toggle('brightness-150', currentStatus);
-                statusEl.textContent = currentStatus ? 'ON' : 'OFF';
-            }
-        };
-
-
-        // --- Real-time Data Listeners ---
-        const setupListeners = () => {
-            if (!db || !isAuthReady) return;
-
-            // 1. Current Status Listener (Metrics and Controls)
-            const currentDocRef = doc(db, CURRENT_STATUS_PATH);
-            currentStatusListener = onSnapshot(currentDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    
-                    // Update Metrics
-                    setHtml('hum', `${data.humidity ? data.humidity.toFixed(1) : 'N/A'}%`);
-                    setHtml('temp', `${data.temperature ? data.temperature.toFixed(1) : 'N/A'}°C`);
-                    setHtml('amm', `${data.ammonia ? data.ammonia.toFixed(1) : 'N/A'}ppm`);
-
-                    // Update Controls UI
-                    updateControlUI('light1', data.light1_on);
-                    updateControlUI('light2', data.light2_on);
-                    updateControlUI('exhaustfan', data.exhaustfan_on);
-                    
-                    // Simple Notification Check (Example)
-                    checkAndShowNotification(data);
-
-                } else {
-                    // Initialize document if it doesn't exist
-                    console.log("Current status document not found. Initializing...");
-                    setDoc(currentDocRef, {
-                        humidity: 60,
-                        temperature: 28,
-                        ammonia: 5,
-                        light1_on: false,
-                        light2_on: false,
-                        exhaustfan_on: false,
-                        last_updated: new Date().toISOString()
-                    });
-                }
-            }, (error) => {
-                console.error("Current status listener error:", error);
-            });
-
-            // 2. History Listener (Charts and Table)
-            const historyQ = query(
-                collection(db, HISTORY_COLLECTION_PATH),
-                orderBy("timestamp", "desc"),
-                limit(MAX_HISTORY_POINTS)
-            );
-            
-            historyListener = onSnapshot(historyQ, (querySnapshot) => {
-                const historyData = [];
-                querySnapshot.forEach((doc) => {
-                    historyData.push(doc.data());
-                });
-                
-                // Sort ascending for chart display (oldest first)
-                historyData.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
-                updateCharts(historyData);
-                updateTable(historyData.reverse()); // Reverse back for table (newest first)
-
-            }, (error) => {
-                console.error("History listener error:", error);
-            });
-        };
-
-        const updateControlUI = (id, isOn) => {
-            const el = getElement(id);
-            const statusEl = getElement(`${id}-status`);
-            
-            const statusText = isOn ? 'ON' : 'OFF';
-            const iconUrl = isOn 
-                ? 'https://placehold.co/64x64/FBBF24/fff?text=ON' 
-                : 'https://placehold.co/64x64/6B7280/fff?text=OFF';
-
-            el.src = iconUrl;
-            el.alt = statusText;
-            el.dataset.status = statusText;
-            el.classList.toggle('opacity-100', isOn);
-            el.classList.toggle('opacity-50', !isOn);
-            el.classList.toggle('filter-grayscale', !isOn);
-            statusEl.textContent = statusText;
-            statusEl.classList.toggle('text-green-500', isOn);
-            statusEl.classList.toggle('text-red-500', !isOn);
-        };
-        
-        // --- Chart Configuration and Update ---
-
-        const createOrUpdateChart = (canvasId, label, color, dataPoints, dataLabels, suggestedMax) => {
-            const ctx = getElement(canvasId).getContext('2d');
-            const data = {
-                labels: dataLabels,
-                datasets: [{
-                    label: label,
-                    data: dataPoints,
-                    borderColor: color,
-                    backgroundColor: color + '33', // 20% opacity
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 3
-                }]
-            };
-
-            const config = {
-                type: 'line',
-                data: data,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            suggestedMax: suggestedMax,
-                            title: { display: true, text: label }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            };
-
-            if (canvasId === 'lineChart') {
-                if (tempChart) { tempChart.destroy(); }
-                tempChart = new Chart(ctx, config);
-            } else if (canvasId === 'lineChart1') {
-                if (humidityChart) { humidityChart.destroy(); }
-                humidityChart = new Chart(ctx, config);
-            }
-        };
-
-        const updateCharts = (historyData) => {
-            const timestamps = historyData.map(d => new Date(d.timestamp.toDate()).toLocaleTimeString());
-            const temperatures = historyData.map(d => d.temperature);
-            const humidities = historyData.map(d => d.humidity);
-
-            // Update Temperature Chart
-            createOrUpdateChart(
-                'lineChart', 
-                'Temperature (°C)', 
-                '#ef4444', // Red-500
-                temperatures, 
-                timestamps, 
-                40
-            );
-
-            // Update Humidity Chart
-            createOrUpdateChart(
-                'lineChart1', 
-                'Humidity (%)', 
-                '#3b82f6', // Blue-500
-                humidities, 
-                timestamps, 
-                100
-            );
-        };
-        
-        // --- Table Update ---
-        const updateTable = (historyData) => {
-            const tbody = getElement('table-body2');
-            if (!tbody) return;
-            tbody.innerHTML = ''; 
-
-            historyData.slice(0, 10).forEach(d => {
-                const date = new Date(d.timestamp.toDate());
-                const dateTime = date.toLocaleString();
-                
-                const row = tbody.insertRow();
-                row.className = 'hover:bg-gray-50 transition-colors';
-                
-                row.insertCell().textContent = dateTime;
-                row.insertCell().textContent = `${d.humidity.toFixed(1)}%`;
-                row.insertCell().textContent = `${d.temperature.toFixed(1)}°C`;
-                row.insertCell().textContent = d.light1 ? d.light1 : (d.light1_on ? 'ON' : 'OFF');
-                row.insertCell().textContent = d.light2 ? d.light2 : (d.light2_on ? 'ON' : 'OFF');
-                row.insertCell().textContent = `${d.ammonia.toFixed(1)}ppm`;
-                row.insertCell().textContent = d.exhaustfan ? d.exhaustfan : (d.exhaustfan_on ? 'ON' : 'OFF');
-
-                // Color code status in the table
-                row.cells[3].classList.add(d.light1_on ? 'text-green-600' : 'text-red-600');
-                row.cells[4].classList.add(d.light2_on ? 'text-green-600' : 'text-red-600');
-                row.cells[6].classList.add(d.exhaustfan_on ? 'text-green-600' : 'text-red-600');
-
-                // Apply warning styles based on thresholds (example)
-                if (d.temperature > 35 || d.temperature < 25) { row.cells[2].classList.add('bg-yellow-100', 'font-bold'); }
-                if (d.ammonia > 15) { row.cells[5].classList.add('bg-red-100', 'font-bold'); }
-            });
-        };
-        
-        // --- Date/Time and Sidebar Toggle (Simplified) ---
-        const updateDateTime = () => {
-            const now = new Date();
-            setHtml('displayDateTime', now.toLocaleString());
-        };
-        setInterval(updateDateTime, 1000);
-        updateDateTime();
-
-        window.toggleSidebar = () => {
-            getElement('navigation').classList.toggle('active');
-            getElement('main-content').classList.toggle('active');
-        };
-
-        let notifiBox = null;
-        window.toggleNotifi = () => {
-            if (!notifiBox) notifiBox = getElement('box');
-            notifiBox.classList.toggle('active');
-            if (notifiBox.classList.contains('active')) {
-                // Clear count when box is opened
-                setHtml('notificationCount', '0');
-                setHtml('notificationCount1', '0');
-            }
-        };
-        
-        const checkAndShowNotification = (data) => {
-            let message = null;
-            if (data.temperature > 35) {
-                message = '⚠️ High Temperature Alert! Chick comfort may be compromised.';
-            } else if (data.ammonia > 15) {
-                message = '⚠️ Ammonia Level Critical! Ventilation is required.';
-            }
-            
-            if (message) {
-                const notifiItems = getElement('notificationItems');
-                // Prepend new message
-                notifiItems.innerHTML = `
-                    <div class="p-3 border-b border-gray-200 text-sm text-red-700 font-semibold">${message}</div>
-                    ${notifiItems.innerHTML}
-                `;
-                
-                let count = parseInt(getElement('notificationCount').textContent);
-                count++;
-                setHtml('notificationCount', count);
-                setHtml('notificationCount1', `(${count})`);
-            }
-        }
-
-
-        // Start initialization when the DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            initFirebase();
-            getElement('toggle-btn').addEventListener('click', window.toggleSidebar);
-        });
-        
-        // Expose toggleDevice to global scope for HTML click events
-        window.toggleDevice = window.toggleDevice;
-        window.toggleNotifi = window.toggleNotifi;
-        
-    </script>
-    <style>
-        /* Custom styles to replicate the original look and feel with Tailwind structure */
-        .navigation {
-            position: fixed;
-            width: 300px;
-            height: 100%;
-            background: #2a2185; /* Dark blue background */
-            border-left: 10px solid #2a2185;
-            transition: 0.5s;
-            overflow: hidden;
-            z-index: 10;
-        }
-
-        .navigation.active {
-            width: 80px;
-        }
-        
-        .navigation ul {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding-left: 0;
-            list-style-type: none;
-        }
-
-        .navigation ul li {
-            position: relative;
-            width: 100%;
-            list-style: none;
-            border-top-left-radius: 30px;
-            border-bottom-left-radius: 30px;
-        }
-        
-        .navigation ul li:hover,
-        .navigation ul li.hovered {
-            background: white;
-        }
-
-        .navigation ul li:nth-child(1) {
-            margin-bottom: 40px;
-            pointer-events: none;
-        }
-
-        .navigation ul li a {
-            position: relative;
-            display: block;
-            width: 100%;
-            display: flex;
-            text-decoration: none;
-            color: white;
-        }
-
-        .navigation ul li:hover a,
-        .navigation ul li.hovered a {
-            color: #2a2185;
-        }
-        
-        .navigation ul li a .icon {
-            position: relative;
-            display: block;
-            min-width: 60px;
-            height: 60px;
-            line-height: 70px;
-            text-align: center;
-        }
-        
-        .navigation ul li a .icon ion-icon {
-            font-size: 1.75em;
-        }
-        
-        .navigation ul li a .title,
-        .navigation ul li a .title1 {
-            position: relative;
-            display: block;
-            padding: 0 10px;
-            height: 60px;
-            line-height: 60px;
-            text-align: start;
-            white-space: nowrap;
-        }
-        
-        /* The main content area */
-        .main {
-            position: absolute;
-            width: calc(100% - 300px);
-            left: 300px;
-            min-height: 100vh;
-            background: #f1f2f6; /* Light gray background */
-            transition: 0.5s;
-        }
-
-        .main.active {
-            width: calc(100% - 80px);
-            left: 80px;
-        }
-        
-        /* Topbar styling */
-        .topbar {
-            width: 100%;
-            height: 60px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-            background: white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-        }
-
-        .toggle {
-            cursor: pointer;
-            font-size: 2em;
-        }
-
-        .user img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-        
-        .iconn {
-            position: relative;
-            cursor: pointer;
-        }
-        
-        .iconn img {
-            width: 30px;
-        }
-        
-        #notificationCount {
-            position: absolute;
-            top: -5px;
-            right: -10px;
-            background: red;
-            color: white;
-            border-radius: 50%;
-            padding: 1px 6px;
-            font-size: 0.75rem;
-            line-height: 1;
-        }
-        
-        .notifi-box {
-            position: absolute;
-            top: 60px;
-            right: 20px;
-            width: 300px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s ease;
-        }
-        
-        .notifi-box.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        
-        .notifi-box h2 {
-            font-size: 1.25rem;
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 0;
-        }
-
-        .charts {
-            padding: 20px;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 991px) {
-            .navigation {
-                left: -300px;
-            }
-            .navigation.active {
-                width: 300px;
-                left: 0;
-            }
-            .main {
-                width: 100%;
-                left: 0;
-            }
-            .main.active {
-                left: 300px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .navigation {
-                width: 100%; /* Full width sidebar on mobile when active */
-                left: -100%;
-            }
-            .navigation.active {
-                left: 0;
-            }
-            .main.active {
-                left: 0;
-            }
-        }
-    </style>
-
+    <meta charset="UTF-8">
+    <title>Environment</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="font-sans bg-gray-100">
+<body>
 
-    <div class="container flex h-screen">
+        <div class="container">
+        <div class="navigation">
+            <ul>
+                <li>
+                                        <a href="{{ url_for('dashboard') }}"> 
+                        <span class="icon">
+                            <img src="{{ url_for('static', filename='imgs/CC.png') }}">
+                        </span>
+                        <span class="title1">Chick Care</span>
+                    </a>
+                </li>
 
-        <!-- Sidebar Navigation -->
-        <div id="navigation" class="navigation">
-            <ul>
-                <!-- Chick Care Logo/Title -->
-                <li class="mb-10">
-                    <a href="#" class="!text-white hover:!text-white">
-                        <span class="icon">
-                            <!-- Placeholder for CC.png -->
-                            <img src="https://placehold.co/60x60/4c45a6/fff?text=CC" class="w-10 h-10 object-cover rounded-md">
-                        </span>
-                        <span class="title1 text-2xl font-bold">Chick Care</span>
-                    </a>
-                </li>
+                <li>
+                                        <a href="{{ url_for('main_dashboard') }}">
+                        <span class="icon">
+                            <ion-icon name="reorder-four-outline"></ion-icon>
+                        </span>
+                        <span class="title">Dashboard</span>
+                    </a>
+                </li>
 
-                <!-- Navigation Items -->
-                <li><a href="#"><span class="icon"><ion-icon name="reorder-four-outline"></ion-icon></span><span class="title">Dashboard</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="stats-chart-outline"></ion-icon></span><span class="title">Growth Tracking</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="layers-outline"></ion-icon></span><span class="title">Supplies Stock</span></a></li>
-                <li class="hovered bg-white border-b-4 border-l-0 border-t-4 border-r-0 border-indigo-600"><a href="#" class="!text-indigo-800"><span class="icon"><ion-icon name="cloudy-outline"></ion-icon></span><span class="title">Environment</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="notifications-circle-outline"></ion-icon></span><span class="title">Notifications</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="water-outline"></ion-icon></span><span class="title">Sanitization</span></a></li>
-                <!-- Admin link (shown regardless of session for standalone example) -->
-                <li><a href="#"><span class="icon"><ion-icon name="people-outline"></ion-icon></span><span class="title">Manage Users</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="file-tray-stacked-outline"></ion-icon></span><span class="title">Report</span></a></li>
-                <li><a href="#"><span class="icon"><ion-icon name="log-out-outline"></ion-icon></span><span class="title">Sign Out</span></a></li>
-            </ul>
-        </div>
+                <li>
+                                        <a href="{{ url_for('webcam') }}">
+                        <span class="icon">
+                            <ion-icon name="stats-chart-outline"></ion-icon>
+                        </span>
+                        <span class="title">Growth Tracking</span>
+                    </a>
+                </li>
 
-        <!-- Main Content Area -->
-        <div id="main-content" class="main">
-            <!-- Top Bar -->
-            <div class="topbar">
-                <div id="toggle-btn" class="toggle">
-                    <ion-icon name="menu-outline"></ion-icon>
-                </div>
+                <li>
+                                        <a href="{{ url_for('feeding') }}">
+                        <span class="icon">
+                            <ion-icon name="layers-outline"></ion-icon>
+                        </span>
+                        <span class="title">Supplies Stock</span>
+                    </a>
+                </li>
 
-                <div class="datetime text-gray-600 font-medium">
-                    <span id="displayDateTime">Loading Date...</span>
-                </div>
+                <li>
+                                        <a href="{{ url_for('environment') }}">
+                        <span class="icon">
+                            <ion-icon name="cloudy-outline"></ion-icon>
+                        </span>
+                        <span class="title">Environment</span>
+                    </a>
+                </li>
 
-                <!-- Notification Bell -->
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="https://placehold.co/30x30/f0f0f0/333?text=🔔" alt="Notifications">
-                    <span id="notificationCount">0</span>
-                </div>
-                <div class="notifi-box right-4 md:right-8 lg:right-10 shadow-xl" id="box">
-                    <h2 class="text-indigo-800">Notifications <span id="notificationCount1" class="text-red-500">0</span></h2>
-                    <div class="notifi-item max-h-60 overflow-y-auto">
-                        <div class="text" id="notificationItems">
-                            <div class="p-3 border-b border-gray-200 text-sm text-gray-500">No new notifications.</div>
-                        </div>
-                    </div>
-                </div>
+                <li>
+                                        <a href="{{ url_for('dashboard') }}">
+                        <span class="icon">
+                            <ion-icon name="notifications-circle-outline"></ion-icon>
+                        </span>
+                        <span class="title">Notifications</span>
+                    </a>
+                </li>
 
-                <!-- User Profile -->
-                <div class="user">
-                    <img src="https://placehold.co/40x40/4c45a6/fff?text=AD" alt="Admin Profile" class="rounded-full">
-                </div>
-            </div>
+                <li>
+                                        <a href="{{ url_for('sanitization') }}">
+                        <span class="icon">
+                            <ion-icon name="water-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sanitization</span>
+                    </a>
+                </li>
 
-            <!-- Dashboard Content -->
-            <div class="p-4 md:p-6 lg:p-8">
-                <h1 class="text-3xl font-bold text-gray-800 mb-6">Environment Monitoring</h1>
+                                {% if session.get('user_role') == 'admin' %}
+                <li>
+                                        <a href="{{ url_for('manage_users') }}">
+                        <span class="icon">
+                            <ion-icon name="people-outline"></ion-icon>
+                        </span>
+                        <span class="title">Manage Users</span>
+                    </a>
+                </li>
+                {% endif %}
 
-                <!-- Real-time Status Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <!-- Humidity Card -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex justify-between items-center transition duration-300 hover:shadow-xl">
-                        <div>
-                            <div id="hum" class="numbers text-4xl font-extrabold text-blue-600">--%</div>
-                            <div class="cardName text-gray-500 mt-1">Humidity</div>
-                        </div>
-                        <div class="iconBx text-4xl text-blue-400">
-                            <ion-icon name="water-outline"></ion-icon>
-                        </div>
-                    </div>
-                    <!-- Temperature Card -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex justify-between items-center transition duration-300 hover:shadow-xl">
-                        <div>
-                            <div id="temp" class="numbers text-4xl font-extrabold text-red-600">--°C</div>
-                            <div class="cardName text-gray-500 mt-1">Temperature</div>
-                        </div>
-                        <div class="iconBx text-4xl text-red-400">
-                            <ion-icon name="thermometer-outline"></ion-icon>
-                        </div>
-                    </div>
-                    <!-- Ammonia Card -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex justify-between items-center transition duration-300 hover:shadow-xl">
-                        <div>
-                            <div id="amm" class="numbers text-4xl font-extrabold text-green-600">--ppm</div>
-                            <div class="cardName text-gray-500 mt-1">Ammonia</div>
-                        </div>
-                        <div class="iconBx text-4xl text-green-400">
-                            <ion-icon name="leaf-outline"></ion-icon>
-                        </div>
-                    </div>
-                </div>
+                <li>
+                                        <a href="{{ url_for('report') }}">
+                        <span class="icon">
+                            <ion-icon name="file-tray-stacked-outline"></ion-icon>
+                        </span>
+                        <span class="title">Report</span>
+                    </a>
+                </li>
 
-                <!-- Control Buttons -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                    <!-- Light 1 Control -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-3 cursor-pointer" onclick="toggleDevice('light1')">
-                        <div id="light1-status" class="numbers text-xl font-semibold text-red-500">OFF</div>
-                        <div class="cardName text-gray-500">Light 1</div>
-                        <img id="light1" data-status="OFF" src="https://placehold.co/64x64/6B7280/fff?text=OFF" alt="Light 1" class="w-16 h-16 transition-all duration-300 opacity-50 filter-grayscale">
-                    </div>
-                    <!-- Light 2 Control -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-3 cursor-pointer" onclick="toggleDevice('light2')">
-                        <div id="light2-status" class="numbers text-xl font-semibold text-red-500">OFF</div>
-                        <div class="cardName text-gray-500">Light 2</div>
-                        <img id="light2" data-status="OFF" src="https://placehold.co/64x64/6B7280/fff?text=OFF" alt="Light 2" class="w-16 h-16 transition-all duration-300 opacity-50 filter-grayscale">
-                    </div>
-                    <!-- Exhaust Fan Control -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-3 cursor-pointer" onclick="toggleDevice('exhaustfan')">
-                        <div id="exhaustfan-status" class="numbers text-xl font-semibold text-red-500">OFF</div>
-                        <div class="cardName text-gray-500">Exhaust Fan</div>
-                        <img id="exhaustfan" data-status="OFF" src="https://placehold.co/64x64/6B7280/fff?text=OFF" alt="Exhaust Fan" class="w-16 h-16 transition-all duration-300 opacity-50 filter-grayscale">
-                    </div>
-                </div>
+                <li>
+                                        <a href="{{ url_for('logout') }}">
+                        <span class="icon">
+                            <ion-icon name="log-out-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sign Out</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-                <!-- Charts -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    <!-- Temperature Chart -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg h-96">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Temperature Trend</h2>
-                        <div class="h-80">
-                            <canvas id="lineChart"></canvas>
-                        </div>
-                    </div>
-                    <!-- Humidity Chart -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg h-96">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Humidity Trend</h2>
-                        <div class="h-80">
-                            <canvas id="lineChart1"></canvas>
-                        </div>
-                    </div>
-                </div>
+                <div class="main">
+            <div class="topbar">
+                <div class="toggle">
+                    <ion-icon name="menu-outline"></ion-icon>
+                </div>
 
-                <!-- History Table -->
-                <div class="EnviTable bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Environment History (Last 10 Readings)</h2>
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DateTime</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Humidity</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temperature</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Light 1</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Light 2</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ammonia</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ExhaustFan</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-body2" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="7" class="text-center py-4 text-gray-500">Loading data...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div class="datetime">
+                    <span id="displayDateTime"></span>
+                </div>
 
-            </div>
-        </div>
-    </div>
+		        <div class="iconn" onclick="toggleNotifi()">
+			        <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt=""> 
+                    <span id="notificationCount">0</span>
+		        </div>
+		        <div class="notifi-box" id="box">
+			        <h2>Notifications <span id="notificationCount1">0</span></h2>
+			        <div class="notifi-item">
+				        <div class="text" id="notificationItems"></div>
+			        </div>
+		        </div>
 
-    <!-- IonIcons Script -->
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+                <div class="user">
+                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
+                </div>
+            </div>
+
+                <div class="status">
+            <h1>Environment</h1>
+            <div class="cardBox">
+                <div class="card">
+                    <div>
+                        <div id="hum" class="numbers"></div>
+                        <div class="cardName">Humidity</div>
+                    </div>
+                    <div class="iconBx">
+                        <img class="humid" src="{{ url_for('static', filename='imgs/humidity.png') }}">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div>
+                        <div id="temp" class="numbers"></div>
+                        <div class="cardName">Temperature</div>
+                    </div>
+                    <div class="iconBx">
+                        <img class="temp" src="{{ url_for('static', filename='imgs/temperature.png') }}">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div>
+                        <div id="amm" class="numbers"></div>
+                        <div class="cardName">Ammonia</div>
+                    </div>
+                    <div class="iconBx">
+                        <img class="amm" src="{{ url_for('static', filename='imgs/ammonia.jpg') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cardBox1">
+            <div class="card">
+                <div>
+                    <div class="numbers" id="light1-status"></div>
+                    <div class="cardName">Light 1</div>
+                </div>
+                <div class="iconBx">
+                    <img class="l1-btn" id="light1" src="{{ url_for('static', filename='imgs/LightA.png') }}" alt="Light 1">
+                </div>
+            </div>
+
+            <div class="card">
+                <div>
+                    <div class="numbers" id="light2-status"></div>
+                    <div class="cardName">Light 2</div>
+                </div>
+                <div class="iconBx">
+                    <img class="l2-btn" id="light2" src="{{ url_for('static', filename='imgs/LightA.png') }}" alt="Light 2">
+                </div>
+            </div>
+
+            <div class="card">
+                <div>
+                    <div class="numbers" id="exhaustfan-status"></div>
+                    <div class="cardName">Exhaust Fan</div>
+                </div>
+                <div class="iconBx">
+                    <img class="x-fan-btn" id="exhaustfan" src="{{ url_for('static', filename='imgs/exhaust-fan.png') }}" alt="Exhaust Fan">
+                </div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart">
+                <h2>Temperature</h2>
+                <div>
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart">
+                <h2>Humidity</h2>
+                <div>
+                    <canvas id="lineChart1"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="EnviTable">
+            <table id="table-body2" border="1">
+                <thead>
+                    <tr>
+                        <th>DateTime</th>
+                        <th>Humidity</th>
+                        <th>Temperature</th>
+                        <th>Light 1</th>
+                        <th>Light 2</th>
+                        <th>Ammonia</th>
+                        <th>ExhaustFan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                                    </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 
 </body>
 </html>
