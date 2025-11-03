@@ -2,11 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard | Chick Care</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
-    /* Existing styles preserved */
     .admin-tabs {
       margin: 20px;
     }
@@ -37,60 +35,17 @@
     .tab-content.active {
       display: block;
     }
-
-    /* New styles for functional elements */
-    .notifications-dropdown {
-        position: absolute;
-        top: 60px; /* Adjust based on your topbar height */
-        right: 10px;
-        width: 300px;
-        max-height: 400px;
-        overflow-y: auto;
-        background: #fff;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        z-index: 1000;
-        padding: 10px;
-        display: none; /* Initially hidden */
-    }
-    .notifications-dropdown.active {
-        display: block;
-    }
-    .notification-item {
-        padding: 8px 0;
-        border-bottom: 1px dashed #eee;
-        font-size: 0.9em;
-    }
-    .notification-item:last-child {
-        border-bottom: none;
-    }
-    .notification-date {
-        font-size: 0.75em;
-        color: #888;
-        display: block;
-    }
-    /* Style for action button */
-    .delete-button {
-        background-color: #ff4d4d;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-    .delete-button:hover {
-        background-color: #cc0000;
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="navigation">
       <ul>
-            <!-- FIX 1: Removed redundant tab links from navigation. Kept the Sign Out link -->
-        <li><a href="{{ url_for('logout') }}">Sign Out</a></li>
+        
+                        <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
+        <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
+        
+                <li><a href="{{ url_for('logout') }}">Sign Out</a></li>
       </ul>
     </div>
 
@@ -103,26 +58,18 @@
           <span id="displayDateTime"></span>
         </div>
         <div class="iconn" onclick="toggleNotifi()">
-          <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="Notifications">
+          <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="">
           <span id="notificationCount">0</span>
         </div>
-        <!-- FIX 2: Added the notifications dropdown element -->
-        <div id="notifications-dropdown" class="notifications-dropdown">
-            <h4>System Notifications</h4>
-            <div id="dropdown-content">
-                <!-- Notifications will be loaded here by JavaScript -->
-                <p style="text-align: center; color: #888;">No recent alerts.</p>
-            </div>
-        </div>
         <div class="user">
-          <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="Admin User">
+          <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
         </div>
       </div>
 
       <div class="admin-tabs">
         <ul>
-          <li><a href="#manageUsers" class="tab-link active" data-tab="manageUsers">Manage Users</a></li>
-          <li><a href="#systemFunctions" class="tab-link" data-tab="systemFunctions">System Functions</a></li>
+          <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
+          <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
         </ul>
       </div>
 
@@ -139,15 +86,13 @@
               </tr>
             </thead>
             <tbody>
-              {% for user in users %}
+                                          {% for user in users %}
               <tr>
                 <td>{{ user.id }}</td>
                 <td>{{ user.Email }}</td>
                 <td>{{ user.Username }}</td>
                 <td>
-                    <!-- FIX 3: Added a placeholder delete button for functionality -->
-                    <button class="delete-button" onclick="deleteUser({{ user.id }})">Delete</button>
-                </td>
+                                  </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -166,7 +111,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for notif in notifications %}
+                                          {% for notif in notifications %}
               <tr>
                 <td>{{ notif.DateTime }}</td>
                 <td>{{ notif.message }}</td>
@@ -184,48 +129,16 @@
   <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
   <script>
-    // FIX 4: Added notification and user functions
-    const dropdown = document.getElementById('notifications-dropdown');
-    
-    // Function to handle the notification bell click
-    function toggleNotifi() {
-        dropdown.classList.toggle('active');
-    }
-
-    // Function to handle the delete button click (Placeholder logic)
-    function deleteUser(userId) {
-        // NOTE: You must implement the backend Flask route for this action!
-        if (confirm(`Are you sure you want to delete user ID ${userId}?`)) {
-            console.log(`Deleting user: ${userId}`);
-            // TODO: Add fetch request here to call a Flask route like:
-            // fetch(`/admin/delete_user/${userId}`, { method: 'POST' }).then(...)
-            alert(`User ID ${userId} deleted (simulated).`);
-        }
-    }
-
-
-    // FIX 5: Updated tab switching logic for better synchronization
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
 
     tabLinks.forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
-        const targetId = this.getAttribute('href');
-
-        // 1. Remove active class from ALL links (in admin-tabs bar)
         tabLinks.forEach(l => l.classList.remove('active'));
-        
-        // 2. Add active class to the clicked link
-        this.classList.add('active');
-        
-        // 3. Ensure the matching link in the *other* area also gets the active class
-        document.querySelectorAll(`.tab-link[href='${targetId}']`).forEach(l => l.classList.add('active'));
-
-
-        // 4. Switch content
         tabContents.forEach(c => c.classList.remove('active'));
-        document.querySelector(targetId).classList.add('active');
+        this.classList.add('active');
+        document.querySelector(this.getAttribute('href')).classList.add('active');
       });
     });
   </script>
