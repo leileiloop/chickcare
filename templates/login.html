@@ -3,175 +3,194 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login Form | Dan Aleko</title>
-
-  <!-- Boxicons for icons -->
+  <title>Login & Reset Forms | Dan Aleko</title>
+  <!-- Load Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load Boxicons for icons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
-    /* ====================== Login Form Design ========================== */
-    *{
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Poppins", sans-serif;
+    /* Custom styles for background and font application */
+    body {
+      /* Simulating a dark, blurred background */
+      background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+      font-family: 'Inter', sans-serif;
     }
-    body{
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat;
-      background-size: cover;
-      background-position: center;
+    /* Specific styling for the input box for the icon positioning */
+    .input-box-container {
+        position: relative;
     }
-    .wrapper{
-      width: 420px;
-      background: transparent;
-      border: 2px solid rgba(255, 255, 255, .2);
-      backdrop-filter: blur(60px);
-      color: #fff;
-      border-radius: 12px;
-      padding: 30px 40px;
+    .input-icon {
+        position: absolute;
+        right: 1.25rem; /* 20px */
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.25rem; /* 20px */
+        color: rgba(255, 255, 255, 0.8);
     }
-    .wrapper h1{
-      font-size: 36px;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .wrapper .input-box{
-      position: relative;
-      width: 100%;
-      height: 50px;
-      margin: 30px 0;
-    }
-    .input-box input{
-      width: 100%;
-      height: 100%;
-      background: transparent;
-      border: none;
-      outline: none;
-      border: 2px solid rgba(255, 255, 255, .2);
-      border-radius: 40px;
-      font-size: 16px;
-      color: #fff;
-      padding: 20px 45px 20px 20px;
-    }
-    .input-box input::placeholder{
-      color: #fff;
-    }
-    .input-box i{
-      position: absolute;
-      right: 20px;
-      top: 30%;
-      transform: translate(-50%);
-      font-size: 20px;
-    }
-    .wrapper .remember-forgot{
-      display: flex;
-      justify-content: space-between;
-      font-size: 14.5px;
-      margin: -15px 0 15px;
-    }
-    .remember-forgot label input{
-      accent-color: #fff;
-      margin-right: 3px;
-    }
-    .remember-forgot a{
-      color: #fff;
-      text-decoration: none;
-    }
-    .remember-forgot a:hover{
-      text-decoration: underline;
-    }
-    .wrapper .btn{
-      width: 100%;
-      height: 45px;
-      background: #fff;
-      border: none;
-      outline: none;
-      border-radius: 40px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, .1);
-      cursor: pointer;
-      font-size: 16px;
-      color: #333;
-      font-weight: 600;
-    }
-    .wrapper .register-link{
-      font-size: 14.5px;
-      text-align: center;
-      margin: 20px 0 15px;
-    }
-    .register-link p a{
-      color: #fff;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .register-link p a:hover{
-      text-decoration: underline;
-    }
-    .txt1 {
-      font-family: Poppins-Regular;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #999999;
-    }
-    .error {
-      color: #ff6b6b;
-      text-align: center;
-      margin-bottom: 10px;
-      font-weight: bold;
-    }
-    .flash-message {
-      text-align: center;
-      margin-bottom: 10px;
-      font-weight: bold;
-      color: #ffd700; /* yellow for flash messages */
+    /* Input placeholder color fix for transparent background */
+    .form-input::placeholder {
+        color: rgba(255, 255, 255, 0.7);
     }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-      <h1>Login</h1>
+<body class="flex items-center justify-center min-h-screen p-4">
 
-      <!-- Display flash messages -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <p class="flash-message {{ category }}">{{ message }}</p>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+  <!-- Main Wrapper -->
+  <div class="w-full max-w-sm p-8 md:p-10 bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl text-white transform hover:shadow-3xl transition duration-500">
 
-      <!-- Display login error -->
-      {% if error %}
-          <p class="error">{{ error }}</p>
-      {% endif %}
+    <!-- LOGIN FORM (Default View) -->
+    <div id="loginForm" class="form-container">
+      <h1 class="text-3xl font-extrabold text-center mb-8">Login</h1>
 
-      <form method="post" action="{{ url_for('login') }}">
-        <div class="input-box">
-          <input type="text" name="username" placeholder="Username" required>
-          <i class='bx bxs-user'></i>
+      <!-- Placeholder for Flash Messages (Error/Success) -->
+      <div id="flash-message-container-login" class="mb-4">
+          <!-- Server-side messages for login errors/success -->
+      </div>
+
+      <form method="post" action="/login">
+        <!-- Username Input -->
+        <div class="input-box-container mb-6">
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            required
+            class="form-input w-full h-14 px-5 bg-white/10 border border-white/30 rounded-full text-white focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent transition duration-300 placeholder-white/80"
+          >
+          <i class='bx bxs-user input-icon'></i>
         </div>
-        <div class="input-box">
-          <input type="password" name="password" placeholder="Password" required>
-          <i class='bx bxs-lock-alt'></i>
+
+        <!-- Password Input -->
+        <div class="input-box-container mb-6">
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            required
+            class="form-input w-full h-14 px-5 bg-white/10 border border-white/30 rounded-full text-white focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent transition duration-300 placeholder-white/80"
+          >
+          <i class='bx bxs-lock-alt input-icon'></i>
         </div>
-        <div class="remember-forgot">
-          <label><input type="checkbox" name="remember"> Remember me</label>
-          <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+
+        <!-- Remember Me & Forgot Password -->
+        <div class="flex justify-between items-center text-sm mb-6">
+          <label class="flex items-center cursor-pointer">
+            <input type="checkbox" name="remember" class="mr-2 accent-white w-4 h-4 rounded">
+            Remember me
+          </label>
+          <a href="#" id="showForgotPassword" class="text-white/80 hover:underline hover:text-white transition duration-200">
+            Forgot Password?
+          </a>
         </div>
-        <button type="submit" class="btn">Login</button>
-        <div class="register-link">
-            <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+
+        <!-- Login Button -->
+        <button
+          type="submit"
+          class="w-full h-12 bg-white text-gray-900 font-bold rounded-full text-lg shadow-xl hover:bg-gray-200 transition duration-300"
+        >
+          Login
+        </button>
+
+        <!-- Register Link -->
+        <div class="text-center text-sm mt-6">
+          <p>Don't have an account?
+            <a href="/register" class="text-yellow-300 font-semibold hover:underline transition duration-200">
+              Register
+            </a>
+          </p>
         </div>
       </form>
+    </div>
+
+    <!-- FORGOT PASSWORD FORM (Hidden by Default) -->
+    <div id="forgotPasswordForm" class="form-container hidden">
+      <h1 class="text-3xl font-extrabold text-center mb-4">Reset Password</h1>
+      <p class="text-center text-sm mb-8 text-white/80">
+          Enter your email to receive a password reset link.
+      </p>
+
+      <!-- Placeholder for Flash Messages (Error/Success) -->
+      <div id="flash-message-container-forgot" class="mb-4">
+          <!-- Server-side messages for reset success/errors -->
+      </div>
+
+      <form method="post" action="/forgot_password">
+        <!-- Email Input -->
+        <div class="input-box-container mb-6">
+          <input
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            required
+            class="form-input w-full h-14 px-5 bg-white/10 border border-white/30 rounded-full text-white focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent transition duration-300 placeholder-white/80"
+          >
+          <i class='bx bxs-envelope input-icon'></i>
+        </div>
+
+        <!-- Submit Button -->
+        <button
+          type="submit"
+          class="w-full h-12 bg-yellow-300 text-gray-900 font-bold rounded-full text-lg shadow-xl hover:bg-yellow-400 transition duration-300"
+        >
+          Send Reset Link
+        </button>
+
+        <!-- Back to Login/Register Links -->
+        <div class="text-center text-sm mt-6 space-y-2">
+          <p>Remembered your password?
+            <a href="#" id="showLoginFromForgot" class="text-yellow-300 font-semibold hover:underline transition duration-200">
+              Back to Login
+            </a>
+          </p>
+          <p>Need an account?
+            <a href="/register" class="text-white/80 font-semibold hover:underline transition duration-200">
+              Register
+            </a>
+          </p>
+        </div>
+      </form>
+    </div>
+
   </div>
 
-  <!-- Optional JS -->
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    // === Form Toggling Logic ===
+    const loginForm = document.getElementById('loginForm');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const showForgotPasswordLink = document.getElementById('showForgotPassword');
+    const showLoginFromForgotLink = document.getElementById('showLoginFromForgot');
+
+    /**
+     * Toggles the visibility between the login and forgot password forms.
+     * @param {string} formToShow - 'login' or 'forgot'
+     */
+    function showForm(formToShow) {
+        if (formToShow === 'forgot') {
+            loginForm.classList.add('hidden');
+            forgotPasswordForm.classList.remove('hidden');
+        } else {
+            loginForm.classList.remove('hidden');
+            forgotPasswordForm.classList.add('hidden');
+        }
+    }
+
+    // Event listeners to switch forms
+    showForgotPasswordLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        showForm('forgot');
+    });
+
+    showLoginFromForgotLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        showForm('login');
+    });
+
+    // Optional: Check URL parameters or server-side state to pre-show the Forgot Password form
+    // if a reset attempt failed or was requested on load.
+    // Example: if (window.location.search.includes('reset=true')) { showForm('forgot'); }
+
+  </script>
 </body>
 </html>
