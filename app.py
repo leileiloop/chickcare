@@ -5,6 +5,7 @@ from psycopg.errors import UniqueViolation, OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import secrets
+import functools # ADDED: Required for the @login_required decorator
 
 # -------------------------
 # App Configuration
@@ -17,8 +18,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey") # Change in prod
 # -------------------------
 # CRITICAL: For deployment on Render, the DATABASE_URL environment variable MUST be set
 # to the External Database URL of your PostgreSQL service. 
-# We explicitly rely on the environment variable, providing None as a local fallback
-# which will immediately fail with a clear message if run locally without setup.
 DATABASE_URL = os.environ.get("DATABASE_URL") 
 
 def get_db_connection():
@@ -30,15 +29,25 @@ def get_db_connection():
     # Ensure sslmode="require" is used, which is mandatory for Render PostgreSQL.
     try:
         # FIX: Explicitly use conninfo=DATABASE_URL to ensure psycopg treats it as the connection string.
-        # This prevents the "invalid connection option" error caused by argument parsing confusion.
         return psycopg.connect(conninfo=DATABASE_URL, row_factory=dict_row, sslmode="require")
     except OperationalError as e:
         # Catch specific psycopg connection errors (like wrong URL, host unreachable)
         raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
 
 # -------------------------
-# Utility Functions
+# Utility Functions & Decorators
 # -------------------------
+
+def login_required(view):
+    """Decorator to check if a user is logged in."""
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if "user_role" not in session:
+            flash("You need to log in to view this page.", "warning")
+            return redirect(url_for("login"))
+        return view(**kwargs)
+    return wrapped_view
+
 def list_shots():
     """Return a list of image files in static/shots."""
     shots_dir = os.path.join(app.static_folder, "shots")
@@ -141,7 +150,7 @@ def forgot_password():
                     else:
                         flash("Email not found.", "danger")
         except (ValueError, ConnectionError, Exception) as e:
-            # FIX: Used the general exception handling that was already defined to catch the connection errors here too.
+            # Used the general exception handling that was already defined to catch the connection errors here too.
             flash(f"Password reset failed: {e}", "danger")
 
     return render_template("forgot_password.html")
@@ -150,6 +159,7 @@ def forgot_password():
 # Dashboard Routes
 # -------------------------
 @app.route("/dashboard")
+@login_required
 def dashboard():
     if "user_role" not in session:
         return redirect(url_for("login"))
@@ -160,8 +170,6 @@ def dashboard():
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # Attempt to select from notifications table (assuming you created it)
-                # NOTE: The table 'notifications' was not included in your SQL dumps. 
-                # This query might fail if the table hasn't been created yet.
                 try:
                     cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
                     notifications = cur.fetchall()
@@ -173,6 +181,7 @@ def dashboard():
                 latest_sensor = cur.fetchone()
     except (ValueError, ConnectionError, Exception) as e:
         print(f"Error fetching dashboard data: {e}")
+        flash(f"Error loading dashboard data: {e}", "danger") # Added flash message for UI feedback
         # Application continues even if data fetching failed
 
     return render_template(
@@ -183,18 +192,30 @@ def dashboard():
     )
 
 @app.route("/main_dashboard")
+@login_required # Route protected
 def main_dashboard():
     return render_template("main-dashboard.html")
 
 @app.route("/admin_dashboard")
+@login_required # Route protected
 def admin_dashboard():
+    # ADDED: Security check for admin role
+    if session.get("user_role") != "admin":
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("dashboard"))
     return render_template("admin-dashboard.html")
 
 @app.route("/manage_users")
+@login_required # Route protected
 def manage_users():
+    # ADDED: Security check for admin role
+    if session.get("user_role") != "admin":
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("dashboard"))
     return render_template("manage-users.html")
 
 @app.route("/report")
+@login_required # Route protected
 def report():
     return render_template("report.html")
 
@@ -245,7 +266,7 @@ def get_all_notifications():
                 cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 50")
                 rows = cur.fetchall()
         return jsonify(rows)
-    except (ValueError, ConnectionError, Exception) as e:
+    except (ValueError, ConnectionError, OperationalError) as e: # Catch OperationalError for missing table
         print(f"Error in get_all_notifications: {e}")
         return jsonify({"error": "Database connection or query failed", "detail": str(e)}), 500
 
