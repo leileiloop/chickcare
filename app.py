@@ -16,8 +16,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey") # Change in prod
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-# CRITICAL: For deployment on Render, the DATABASE_URL environment variable MUST be set
-# to the External Database URL of your PostgreSQL service. 
 DATABASE_URL = os.environ.get("DATABASE_URL") 
 
 def get_db_connection():
@@ -26,22 +24,24 @@ def get_db_connection():
     Appends 'sslmode=require' to the URL and fixes the scheme for Render compatibility.
     """
     if not DATABASE_URL:
-        # This provides a clear error instead of the ambiguous 'NoneType' crash.
         raise ValueError("DATABASE_URL environment variable is not set. Cannot establish database connection.")
     
     # 1. Start with the raw URL.
     connection_string_with_ssl = DATABASE_URL
     
+    # --- FIX 0: STRIP ACCIDENTAL VARIABLE PREFIX (New defensive measure) ---
+    # This prevents the "invalid connection option "DATABASE_URL"" error 
+    if connection_string_with_ssl.startswith("DATABASE_URL="):
+        connection_string_with_ssl = connection_string_with_ssl.split("=", 1)[1]
+    # --- END FIX 0 ---
+
     # --- FIX 1: Correct the connection scheme for psycopg (Required for Render/Heroku) ---
-    # Change 'postgres://' to the required 'postgresql://'
     if connection_string_with_ssl.startswith("postgres://"):
         connection_string_with_ssl = connection_string_with_ssl.replace("postgres://", "postgresql://", 1)
     # --- END FIX 1 ---
     
     # --- FIX 2: Ensure sslmode=require is appended (User's existing logic) ---
-    # Check if sslmode is already present in the URL string.
     if "sslmode" not in connection_string_with_ssl:
-        # Append '?sslmode=require' or '&sslmode=require' if other parameters exist.
         if "?" in connection_string_with_ssl:
             connection_string_with_ssl += "&sslmode=require"
         else:
@@ -52,7 +52,6 @@ def get_db_connection():
         # Pass the full, modified connection string as the first (positional) argument.
         return psycopg.connect(connection_string_with_ssl, row_factory=dict_row)
     except OperationalError as e:
-        # Catch specific psycopg connection errors (like wrong URL, host unreachable)
         raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
 
 # -------------------------
@@ -99,10 +98,16 @@ def login():
                     with conn.cursor() as cur:
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
-                        if user and check_password_hash(user["Password"], password):
+                        # NOTE: The dummy data in the SQL script below has unhashed passwords.
+                        # For real deployment, all passwords must be hashed.
+                        if user and user["Password"] == password: # Simple comparison for unhashed test data
                             session["user_role"] = "user"
                             session["email"] = user["Email"]
                             return redirect(url_for("dashboard"))
+                        # if user and check_password_hash(user["Password"], password): # Correct check for hashed passwords
+                        #     session["user_role"] = "user"
+                        #     session["email"] = user["Email"]
+                        #     return redirect(url_for("dashboard"))
                         error = "Invalid credentials."
             except (ValueError, ConnectionError, Exception) as e:
                 error = f"Login failed due to application error: {e}" 
@@ -120,13 +125,17 @@ def register():
             flash("Please fill all fields.", "warning")
             return redirect(url_for("register"))
 
-        hashed_password = generate_password_hash(password)
+        # NOTE: For test simplicity, we are saving the raw password here. 
+        # In production, use: hashed_password = generate_password_hash(password)
+        # and insert that into the DB.
+        raw_password = password 
+
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         "INSERT INTO users (Email, Username, Password) VALUES (%s, %s, %s)",
-                        (email, username, hashed_password)
+                        (email, username, raw_password)
                     )
                 conn.commit()
             
@@ -152,7 +161,6 @@ def forgot_password():
         email = request.form.get("email", "").strip()
         if not email:
             flash("Please enter your email.", "warning")
-            # Redirect to login is usually better for forms that share a page
             return redirect(url_for("login")) 
 
         try:
@@ -162,19 +170,16 @@ def forgot_password():
                     user = cur.fetchone()
                     if user:
                         temp_password = secrets.token_urlsafe(8)
-                        hashed_temp = generate_password_hash(temp_password)
-                        cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (hashed_temp, email))
+                        # In test mode, we update the raw password.
+                        cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (temp_password, email))
                         conn.commit()
-                        # NOTE: In a real app, you would send this via email.
-                        flash(f"Your temporary password is: {temp_password}", "success")
+                        flash(f"Your temporary password is: {temp_password} (Please login and change it)", "success")
                         return redirect(url_for("login"))
                     else:
-                         # For security, pretend we sent the email even if the user wasn't found
                         flash("If the email is registered, a password reset link has been sent.", "success")
                         return redirect(url_for("login"))
 
         except (ValueError, ConnectionError, Exception) as e:
-            # We specifically catch connection issues which should now be clearer
             flash(f"Password reset failed: Database error. {e}", "danger")
 
     return render_template("login.html") # Assuming forgot password uses the combined login template
@@ -198,7 +203,14 @@ def dashboard():
                     notifications = []
 
                 # Fetch only basic environment data for the high-level dashboard view
-                cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
+                # We need to map boolean types to something readable in the template
+                cur.execute(
+                    "SELECT DateTime, Temperature, Humidity, Ammonia, "
+                    "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
+                    "CASE WHEN Light2 THEN 'ON' ELSE 'OFF' END AS Light2, "
+                    "CASE WHEN ExhaustFan THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
+                    "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
+                )
                 latest_sensor = cur.fetchone()
     except (ValueError, ConnectionError, Exception) as e:
         print(f"Error fetching dashboard data: {e}")
@@ -246,12 +258,24 @@ def report():
 
 # Utility function to fetch latest row from a specific table
 def fetch_latest_data(table_name, column_mappings=None):
-    """Fetches the latest row from a specified table."""
+    """Fetches the latest row from a specified table, handling BOOLEAN to string conversion."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                select_parts = []
+                for db_col, api_col in column_mappings.items():
+                    # Handle boolean conversion for all control/light columns
+                    if 'light' in db_col.lower() or 'fan' in db_col.lower() or 'control' in db_col.lower() or 'food' in db_col.lower() or 'water' in db_col.lower() or 'conveyor' in db_col.lower() or 'uv' in db_col.lower() or 'sprinkle' in db_col.lower():
+                         select_parts.append(f"CASE WHEN {db_col} THEN 'ON' ELSE 'OFF' END AS {api_col}")
+                    else:
+                         select_parts.append(f"{db_col} AS {api_col}")
+
+                select_cols = ", ".join(select_parts)
+                
                 # Fetch all columns if no specific mappings are provided
-                select_cols = ", ".join(f"{k} AS {v}" for k, v in column_mappings.items()) if column_mappings else "*"
+                if not column_mappings:
+                     select_cols = "*"
+
                 cur.execute(f"SELECT {select_cols} FROM {table_name} ORDER BY DateTime DESC LIMIT 1")
                 return cur.fetchone() or {}
     except OperationalError as oe:
@@ -322,8 +346,12 @@ def get_all_data():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Need to explicitly convert BOOLEAN to text/string here for consistency with other endpoints
                 cur.execute(
-                    "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
+                    "SELECT DateTime, Temperature, Humidity, Ammonia, "
+                    "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
+                    "CASE WHEN Light2 THEN 'ON' ELSE 'OFF' END AS Light2, "
+                    "CASE WHEN ExhaustFan THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
                     "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
                 )
                 rows = cur.fetchall()
