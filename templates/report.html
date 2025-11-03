@@ -1,266 +1,379 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Chick Care Record</title>
-    <!-- ======= Styles ====== -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta charset="UTF-8">
+    <title>Chick Care Record</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Minimal styles added for the Report page structure, assuming main styles handle table layout */
+        .attendance-container h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--blue); /* Assuming a CSS variable is defined */
+        }
+        .filter-controls, .period-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .filter-controls select, .filter-controls input, .filter-controls button, .period-buttons button {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .period-buttons .period-btn.active {
+            background-color: var(--blue);
+            color: #fff;
+        }
+        .attendance-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .attendance-table thead th {
+            background-color: var(--blue);
+            color: #fff;
+            padding: 10px;
+            text-align: left;
+        }
+        /* Added CSS to ensure all tables are correctly identified for JS */
+        .all-tables {
+            display: none; /* Hidden by default, JS will show the first one */
+        }
+    </style>
 </head>
 <body>
 
-    <!-- =============== Navigation ================ -->
-    <div class="container">
-        <div class="navigation">
-            <ul>
-                <li>
-                    <a href="#">
-                        <span class="icon">
-                            <img src="static/imgs/CC.png">
-                        </span>
-                        <span class="title1">Chick Care</span>
-                    </a>
-                </li>
+        <div class="container">
+        <div class="navigation">
+            <ul>
+                <li>
+                    <a href="#">
+                        <span class="icon">
+                            <img src="static/imgs/CC.png" alt="Logo">
+                        </span>
+                        <span class="title1">Chick Care</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/main_dashboard">
-                        <span class="icon">
-                            <ion-icon name="reorder-four-outline"></ion-icon>
-                        </span>
-                        <span class="title">Dashboard</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/main_dashboard">
+                        <span class="icon">
+                            <ion-icon name="reorder-four-outline"></ion-icon>
+                        </span>
+                        <span class="title">Dashboard</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/webcam">
-                        <span class="icon">
-                            <ion-icon name="stats-chart-outline"></ion-icon>
-                        </span>
-                        <span class="title">Growth Tracking</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/webcam">
+                        <span class="icon">
+                            <ion-icon name="stats-chart-outline"></ion-icon>
+                        </span>
+                        <span class="title">Growth Tracking</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/feeding">
-                        <span class="icon">
-                            <ion-icon name="layers-outline"></ion-icon>
-                        </span>
-                        <span class="title">Supplies Stock</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/feeding">
+                        <span class="icon">
+                            <ion-icon name="layers-outline"></ion-icon>
+                        </span>
+                        <span class="title">Supplies Stock</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/environment">
-                        <span class="icon">
-                            <ion-icon name="cloudy-outline"></ion-icon>
-                        </span>
-                        <span class="title">Environment</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/environment">
+                        <span class="icon">
+                            <ion-icon name="cloudy-outline"></ion-icon>
+                        </span>
+                        <span class="title">Environment</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/dashboard">
-                        <span class="icon">
-                            <ion-icon name="notifications-circle-outline"></ion-icon>
-                        </span>
-                        <span class="title">Notifications</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/dashboard">
+                        <span class="icon">
+                            <ion-icon name="notifications-circle-outline"></ion-icon>
+                        </span>
+                        <span class="title">Notifications</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/sanitization">
-                        <span class="icon">
-                            <ion-icon name="water-outline"></ion-icon>
-                        </span>
-                        <span class="title">Sanitization</span>
-                    </a>
-                </li>
+                <li>
+                    <a href="/sanitization">
+                        <span class="icon">
+                            <ion-icon name="water-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sanitization</span>
+                    </a>
+                </li>
 
-                {% if session['user_role'] == 'admin' %}
-                <li>
-                    <a href="/manage_users">
-                        <span class="icon">
-                            <ion-icon name="people-outline"></ion-icon>
-                        </span>
-                        <span class="title">Manage Users</span>
-                    </a>
-                </li>
-                {% endif %}
+                {% if session['user_role'] == 'admin' %}
+                <li>
+                    <a href="/manage_users">
+                        <span class="icon">
+                            <ion-icon name="people-outline"></ion-icon>
+                        </span>
+                        <span class="title">Manage Users</span>
+                    </a>
+                </li>
+                {% endif %}
 
-                <li>
-                    <a href="/report">
-                        <span class="icon">
-                            <ion-icon name="file-tray-stacked-outline"></ion-icon>
-                        </span>
-                        <span class="title">Report</span>
-                    </a>
-                </li>
+                <li class="active">                     <a href="/report">
+                        <span class="icon">
+                            <ion-icon name="file-tray-stacked-outline"></ion-icon>
+                        </span>
+                        <span class="title">Report</span>
+                    </a>
+                </li>
 
-                <li>
-                    <a href="/login">
-                        <span class="icon">
-                            <ion-icon name="log-out-outline"></ion-icon>
-                        </span>
-                        <span class="title">Sign Out</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+                <li>
+                                        <a href="/logout">
+                        <span class="icon">
+                            <ion-icon name="log-out-outline"></ion-icon>
+                        </span>
+                        <span class="title">Sign Out</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-        <!-- ========================= Main ==================== -->
-        <div class="main">
-            <div class="topbar">
-                <div class="toggle">
-                    <ion-icon name="menu-outline"></ion-icon>
-                </div>
+                <div class="main">
+            <div class="topbar">
+                <div class="toggle">
+                    <ion-icon name="menu-outline"></ion-icon>
+                </div>
 
-                <div class="datetime">
-                    <span id="displayDateTime"></span>
-                </div>
+                <div class="datetime">
+                    <span id="displayDateTime"></span>
+                </div>
 
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
-                </div>
-                <div class="notifi-box" id="box">
-                    <h2>Notifications <span id="notificationCount1">0</span></h2>
-                    <div class="notifi-item">
-                        <div class="text" id="notificationItems"></div>
-                    </div>
-                </div>
+                <div class="iconn" onclick="toggleNotifi()">
+                    <img src="static/imgs/bell.png" alt="Notifications"> <span id="notificationCount">0</span>
+                </div>
+                <div class="notifi-box" id="box">
+                    <h2>Notifications <span id="notificationCount1">0</span></h2>
+                    <div class="notifi-item">
+                        <div class="text" id="notificationItems"></div>
+                    </div>
+                </div>
 
-                <div class="user">
-                    <img src="static/imgs/admin.jpg" alt="">
-                </div>
-            </div>
+                <div class="user">
+                    <img src="static/imgs/admin.jpg" alt="User Profile">
+                </div>
+            </div>
 
-            <!-- ========================= Attendance / Record ==================== -->
-            <div class="attendance-container">
-                <h1>CHICK CARE RECORD</h1>
+                        <div class="attendance-container">
+                <h1>CHICK CARE RECORD</h1>
 
-                <!-- Filter Controls -->
-                <div class="filter-controls">
-                    <select id="recordType">
-                        <option value="growth">Growth Tracking (ChickStatus)</option>
-                        <option value="growth1">Growth Tracking (Weight)</option>
-                        <option value="environment">Environment</option>
-                        <option value="supplies">Supplies Stocks</option>
-                        <option value="notifications">Notifications</option>
-                        <option value="sanitization">Sanitization</option>
-                    </select>
+                                <div class="filter-controls">
+                    <select id="recordType">
+                        <option value="growth">Growth Tracking (ChickStatus)</option>
+                        <option value="growth1">Growth Tracking (Weight)</option>
+                        <option value="environment">Environment</option>
+                        <option value="supplies">Supplies Stocks</option>
+                        <option value="notifications">Notifications</option>
+                        <option value="sanitization">Sanitization</option>
+                    </select>
 
-                    <input type="text" id="searchField" placeholder="Search">
-                    <button id="searchBtn">Enter</button>
+                    <input type="text" id="searchField" placeholder="Search">
+                    <button id="searchBtn">Enter</button>
 
-                    <label for="dateFrom">From:</label>
-                    <input type="date" id="dateFrom" value="2025-07-04">
-                    <label for="dateTo">To:</label>
-                    <input type="date" id="dateTo" value="2025-08-18">
+                    <label for="dateFrom">From:</label>
+                    <input type="date" id="dateFrom" value="2025-07-04">
+                    <label for="dateTo">To:</label>
+                    <input type="date" id="dateTo" value="2025-08-18">
 
-                    <button id="filterBtn" title="Apply Filters">
-                        <ion-icon name="funnel-outline"></ion-icon>
-                    </button>
-                </div>
+                    <button id="filterBtn" title="Apply Filters">
+                        <ion-icon name="funnel-outline"></ion-icon>
+                    </button>
+                </div>
 
-                <!-- Period Buttons -->
-                <div class="period-buttons">
-                    <button id="btnDaily" class="period-btn">Daily</button>
-                    <button id="btnWeekly" class="period-btn">Weekly</button>
-                    <button id="btnMonthly" class="period-btn">Monthly</button>
-                </div>
+                                <div class="period-buttons">
+                    <button id="btnDaily" class="period-btn">Daily</button>
+                    <button id="btnWeekly" class="period-btn">Weekly</button>
+                    <button id="btnMonthly" class="period-btn">Monthly</button>
+                </div>
 
-                <!-- Tables -->
-                <div class="attendance-table" id="tableGrowth" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>ChickNumber</th>
-                                <th>Status (Healthy/Sick)</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                                <div class="attendance-table all-tables" id="tableGrowth" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>ChickNumber</th>
+                                <th>Status (Healthy/Sick)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
 
-                <div class="attendance-table" id="tableGrowth1" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>ChickNumber</th>
-                                <th>Weight</th>
-                                <th>WeighingCount</th>
-                                <th>AverageWeight</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <div class="attendance-table all-tables" id="tableGrowth1" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>ChickNumber</th>
+                                <th>Weight</th>
+                                <th>WeighingCount</th>
+                                <th>AverageWeight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
 
-                <div class="attendance-table" id="tableEnvironment" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Humidity</th>
-                                <th>Temperature</th>
-                                <th>Light1</th>
-                                <th>Light2</th>
-                                <th>Ammonia</th>
-                                <th>ExhaustFan</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <div class="attendance-table all-tables" id="tableEnvironment" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>Humidity</th>
+                                <th>Temperature</th>
+                                <th>Light1</th>
+                                <th>Light2</th>
+                                <th>Ammonia</th>
+                                <th>ExhaustFan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
 
-                <div class="attendance-table" id="tableSupplies" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Food</th>
-                                <th>Water</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <div class="attendance-table all-tables" id="tableSupplies" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>Food (Level)</th>
+                                <th>Water (Level)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
 
-                <div class="attendance-table" id="tableNotifications" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <div class="attendance-table all-tables" id="tableNotifications" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
 
-                <div class="attendance-table" id="tableSanitization" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Conveyor</th>
-                                <th>Sprinkle</th>
-                                <th>UVLight</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+                <div class="attendance-table all-tables" id="tableSanitization" style="display:none">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>DateTime</th>
+                                <th>Conveyor (Status)</th>
+                                <th>Sprinkle (Status)</th>
+                                <th>UVLight (Status)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                                    </tbody>
+                    </table>
+                </div>
+            </div>
 
-        </div>
-    </div>
+        </div>
+    </div>
 
-    <!-- =========== Scripts =========  -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const recordTypeSelect = document.getElementById('recordType');
+            const allTables = document.querySelectorAll('.all-tables');
+            const periodButtons = document.querySelectorAll('.period-btn');
+            const filterBtn = document.getElementById('filterBtn');
+            const searchBtn = document.getElementById('searchBtn');
+
+            /**
+             * Shows the table corresponding to the selected value in the dropdown.
+             */
+            function showSelectedTable() {
+                const selectedValue = recordTypeSelect.value;
+                
+                allTables.forEach(table => {
+                    table.style.display = 'none';
+                });
+
+                const targetTable = document.getElementById('table' + selectedValue.charAt(0).toUpperCase() + selectedValue.slice(1));
+                
+                if (targetTable) {
+                    targetTable.style.display = 'block';
+                }
+            }
+
+            // Event Listener for dropdown change
+            recordTypeSelect.addEventListener('change', showSelectedTable);
+
+            // Initialize by showing the first table
+            showSelectedTable();
+
+            // Period Buttons Logic (Visual feedback and potential AJAX trigger)
+            periodButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    periodButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // TODO: Implement AJAX call here to fetch data for the selected period
+                    console.log('Period selected:', this.textContent.trim());
+                    // fetchData(recordTypeSelect.value, { period: this.textContent.trim() });
+                });
+            });
+
+            // Filter and Search Buttons Logic (Visual feedback and potential AJAX trigger)
+            filterBtn.addEventListener('click', function() {
+                const dateFrom = document.getElementById('dateFrom').value;
+                const dateTo = document.getElementById('dateTo').value;
+
+                // TODO: Implement AJAX call here to fetch data filtered by date
+                console.log('Filtering by date:', dateFrom, 'to', dateTo);
+                // fetchData(recordTypeSelect.value, { dateFrom, dateTo });
+            });
+
+            searchBtn.addEventListener('click', function() {
+                const searchField = document.getElementById('searchField').value;
+                
+                // TODO: Implement AJAX call here to fetch data filtered by search term
+                console.log('Searching for:', searchField);
+                // fetchData(recordTypeSelect.value, { search: searchField });
+            });
+
+            // Optional: Set default 'Daily' button as active for better UX
+            document.getElementById('btnDaily').classList.add('active');
+        });
+
+        // The following functions (toggle, toggleNotifi, updateDateTime) are expected to be in main.js
+        // But if they're not, you'll need to define them here or in main.js
+        // Example placeholder for context:
+        /*
+        function toggle() {
+            const navigation = document.querySelector('.navigation');
+            const main = document.querySelector('.main');
+            navigation.classList.toggle('active');
+            main.classList.toggle('active');
+        }
+        */
+    </script>
 </body>
 </html>
