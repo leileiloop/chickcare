@@ -37,15 +37,6 @@ def login_required(view):
     return wrapped_view
 
 # -------------------------
-# Utility Functions
-# -------------------------
-def list_shots():
-    shots_dir = os.path.join(app.static_folder, "shots")
-    if os.path.exists(shots_dir):
-        return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
-    return []
-
-# -------------------------
 # Authentication Routes
 # -------------------------
 @app.route("/", methods=["GET", "POST"])
@@ -138,9 +129,10 @@ def forgot_password():
                     user = cur.fetchone()
                     if user:
                         token = secrets.token_urlsafe(16)
+                        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
-                        flash("Reset token generated. Please enter a new password.", "success")
+                        flash("Reset token generated. Enter a new password.", "success")
                         return redirect(url_for("reset_password", token=token))
                     else:
                         flash("If registered, password reset instructions sent.", "info")
@@ -188,7 +180,21 @@ def reset_password(token):
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html")
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Example: get latest environment data
+                cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 10")
+                env_data = cur.fetchall()
+
+                cur.execute("SELECT * FROM sensordata4 ORDER BY DateTime DESC LIMIT 10")
+                water_food_data = cur.fetchall()
+    except Exception as e:
+        flash(f"Error fetching dashboard data: {e}", "danger")
+        env_data = []
+        water_food_data = []
+
+    return render_template("dashboard.html", env_data=env_data, water_food_data=water_food_data)
 
 # -------------------------
 # Main Entry
