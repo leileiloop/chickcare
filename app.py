@@ -21,15 +21,33 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey") # Change in prod
 DATABASE_URL = os.environ.get("DATABASE_URL") 
 
 def get_db_connection():
-    """Connect to PostgreSQL with SSL. Raises a clear error if DATABASE_URL is not set or connection fails."""
+    """
+    Connect to PostgreSQL with SSL. 
+    Appends 'sslmode=require' to the URL to ensure Render compatibility without
+    conflicting with the connection string parser.
+    """
     if not DATABASE_URL:
         # This provides a clear error instead of the ambiguous 'NoneType' crash.
         raise ValueError("DATABASE_URL environment variable is not set. Cannot establish database connection.")
     
-    # Ensure sslmode="require" is used, which is mandatory for Render PostgreSQL.
+    # --- FIX APPLIED HERE ---
+    # 1. Start with the raw URL.
+    connection_string_with_ssl = DATABASE_URL
+    
+    # 2. Check if sslmode is already present in the URL string.
+    if "sslmode" not in connection_string_with_ssl:
+        # 3. Append '?sslmode=require' or '&sslmode=require' if other parameters exist.
+        if "?" in connection_string_with_ssl:
+            connection_string_with_ssl += "&sslmode=require"
+        else:
+            connection_string_with_ssl += "?sslmode=require"
+    # --- END FIX ---
+    
     try:
-        # Explicitly use conninfo=DATABASE_URL to ensure psycopg treats it as the connection string.
-        return psycopg.connect(conninfo=DATABASE_URL, row_factory=dict_row, sslmode="require")
+        # Pass the full, modified connection string as the first (positional) argument.
+        # This is equivalent to conninfo= and is the most reliable method.
+        # We explicitly remove the separate sslmode="require" keyword argument here.
+        return psycopg.connect(connection_string_with_ssl, row_factory=dict_row)
     except OperationalError as e:
         # Catch specific psycopg connection errors (like wrong URL, host unreachable)
         raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
@@ -271,8 +289,8 @@ def get_full_sensor_data():
 
     # Check for general database errors
     if any(isinstance(data, dict) and 'error' in data for data in all_data.values()):
-         # If any sub-query failed, return a 500 error
-         return jsonify({"error": "Failed to fetch all sensor data", "details": all_data}), 500
+           # If any sub-query failed, return a 500 error
+           return jsonify({"error": "Failed to fetch all sensor data", "details": all_data}), 500
 
     return jsonify(all_data)
 
