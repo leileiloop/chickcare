@@ -216,9 +216,10 @@ def dashboard():
 
                 cur.execute(
                     "SELECT DateTime, Temperature, Humidity, Ammonia, "
-                    "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
-                    "CASE WHEN Light2 THEN 'ON' ELSE 'OFF' END AS Light2, "
-                    "CASE WHEN ExhaustFan THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
+                    # --- FIX: Compare string value (e.g., 'ON') not boolean ---
+                    "CASE WHEN UPPER(Light1) = 'ON' THEN 'ON' ELSE 'OFF' END AS Light1, "
+                    "CASE WHEN UPPER(Light2) = 'ON' THEN 'ON' ELSE 'OFF' END AS Light2, "
+                    "CASE WHEN UPPER(ExhaustFan) = 'ON' THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
                     "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
                 )
                 latest_sensor = cur.fetchone()
@@ -274,14 +275,15 @@ def fetch_latest_data(table_name, column_mappings=None):
                 select_parts = []
                 for db_col, api_col in column_mappings.items():
                     if 'light' in db_col.lower() or 'fan' in db_col.lower() or 'control' in db_col.lower() or 'food' in db_col.lower() or 'water' in db_col.lower() or 'conveyor' in db_col.lower() or 'uv' in db_col.lower() or 'sprinkle' in db_col.lower():
-                         select_parts.append(f"CASE WHEN {db_col} THEN 'ON' ELSE 'OFF' END AS {api_col}")
+                         # --- FIX: Compare string value (e.g., 'ON') not boolean ---
+                         select_parts.append(f"CASE WHEN UPPER({db_col}) = 'ON' THEN 'ON' ELSE 'OFF' END AS {api_col}")
                     else:
                          select_parts.append(f"{db_col} AS {api_col}")
 
                 select_cols = ", ".join(select_parts)
                 
                 if not column_mappings:
-                     select_cols = "*"
+                        select_cols = "*"
 
                 cur.execute(f"SELECT {select_cols} FROM {table_name} ORDER BY DateTime DESC LIMIT 1")
                 return cur.fetchone() or {}
@@ -353,7 +355,7 @@ def get_sanitization_status():
     return jsonify(data or {"ConveyorControl": "N/A", "SprinkleControl": "N/A", "UVControl": "N/A"})
 
 
-@app.route("/webcam")
+@app.route("/webcam", endpoint="webcam") # --- FIX: Added endpoint='webcam' to match url_for() in template ---
 def get_webcam_feed():
     """Placeholder for the /webcam route causing 404 errors."""
     # This route typically returns a stream or a list of images
@@ -379,9 +381,10 @@ def get_all_data():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT DateTime, Temperature, Humidity, Ammonia, "
-                    "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
-                    "CASE WHEN Light2 THEN 'ON' ELSE 'OFF' END AS Light2, "
-                    "CASE WHEN ExhaustFan THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
+                    # --- FIX: Compare string value (e.g., 'ON') not boolean ---
+                    "CASE WHEN UPPER(Light1) = 'ON' THEN 'ON' ELSE 'OFF' END AS Light1, "
+                    "CASE WHEN UPPER(Light2) = 'ON' THEN 'ON' ELSE 'OFF' END AS Light2, "
+                    "CASE WHEN UPPER(ExhaustFan) = 'ON' THEN 'ON' ELSE 'OFF' END AS ExhaustFan "
                     "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
                 )
                 rows = cur.fetchall()
