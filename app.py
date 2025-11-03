@@ -344,7 +344,7 @@ def get_sanitization_status_api():
 def get_sanitization_history_api():
     """API to fetch historical log data for the sanitization components."""
     history = fetch_history_data(
-        "sensordB_col",
+        "sensordata2", # --- FIX: Was "sensordB_col"
         {"DateTime": "DateTime", "Conveyor": "Conveyor", "Sprinkle": "Sprinkle", "UVLight": "UVLight"},
         limit=50
     )
@@ -443,6 +443,7 @@ def get_all_data():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # --- FIX: Check for string 'ON' instead of boolean ---
                 cur.execute(
                     "SELECT DateTime, Temperature, Humidity, Ammonia, "
                     "CASE WHEN UPPER(Light1) = 'ON' THEN 'ON' ELSE 'OFF' END AS Light1, "
