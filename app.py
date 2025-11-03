@@ -160,7 +160,7 @@ def forgot_password():
         email = request.form.get("email", "").strip()
         if not email:
             flash("Please enter your email.", "warning")
-            return redirect(url_for("forgot_password")) # Stay on forgot page if email is missing
+            return redirect(url_for("forgot_password"))
 
         try:
             with get_db_connection() as conn:
@@ -182,6 +182,8 @@ def forgot_password():
 
         except (ValueError, ConnectionError, Exception) as e:
             flash(f"Password reset failed: Database error. {e}", "danger")
+            # --- FIX: Explicitly redirect on error to follow PRG pattern ---
+            return redirect(url_for("forgot_password"))
     
     # This route must render its own template
     return render_template("forgot_password.html") 
@@ -415,7 +417,7 @@ def get_full_sensor_data():
     )
 
     if any(isinstance(data, dict) and 'error' in data for data in all_data.values()):
-           return jsonify({"error": "Failed to fetch all sensor data", "details": all_data}), 500
+            return jsonify({"error": "Failed to fetch all sensor data", "details": all_data}), 500
 
     return jsonify(all_data)
 
@@ -505,4 +507,3 @@ def health():
 # -------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
-
