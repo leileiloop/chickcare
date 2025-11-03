@@ -1,5 +1,6 @@
 import os
 import secrets
+import json # Import for JSON responses in new routes
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import psycopg
 from psycopg.rows import dict_row
@@ -26,19 +27,15 @@ def get_db_connection():
     if not DATABASE_URL:
         raise ValueError("DATABASE_URL environment variable is not set. Cannot establish database connection.")
     
-    # 1. Start with the raw URL.
     connection_string_with_ssl = DATABASE_URL
     
     # --- FIX 0: STRIP ACCIDENTAL VARIABLE PREFIX (New defensive measure) ---
-    # This prevents the "invalid connection option "DATABASE_URL"" error 
     if connection_string_with_ssl.startswith("DATABASE_URL="):
         connection_string_with_ssl = connection_string_with_ssl.split("=", 1)[1]
-    # --- END FIX 0 ---
-
+    
     # --- FIX 1: Correct the connection scheme for psycopg (Required for Render/Heroku) ---
     if connection_string_with_ssl.startswith("postgres://"):
         connection_string_with_ssl = connection_string_with_ssl.replace("postgres://", "postgresql://", 1)
-    # --- END FIX 1 ---
     
     # --- FIX 2: Ensure sslmode=require is appended (User's existing logic) ---
     if "sslmode" not in connection_string_with_ssl:
@@ -46,12 +43,12 @@ def get_db_connection():
             connection_string_with_ssl += "&sslmode=require"
         else:
             connection_string_with_ssl += "?sslmode=require"
-    # --- END FIX 2 ---
     
     try:
-        # Pass the full, modified connection string as the first (positional) argument.
         return psycopg.connect(connection_string_with_ssl, row_factory=dict_row)
     except OperationalError as e:
+        # Crucial for debugging connection issues
+        print(f"CRITICAL: Database connection failed. Details: {e}")
         raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
 
 # -------------------------
@@ -72,6 +69,7 @@ def list_shots():
     """Return a list of image files in static/shots."""
     shots_dir = os.path.join(app.static_folder, "shots")
     if os.path.exists(shots_dir):
+        # Filter for images and return only file names
         return [f for f in os.listdir(shots_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif"))]
     return []
 
@@ -88,31 +86,44 @@ def login():
 
         if not username or not password:
             error = "Please provide username and password."
+            print("LOGIN FAIL: Missing username or password.")
         elif username.lower() == "admin" and password == "admin":
             session["user_role"] = "admin"
             session["email"] = "admin@yourdomain.com"
+            flash("Admin login successful!", "success")
+            print("LOGIN SUCCESS: Admin logged in.")
             return redirect(url_for("dashboard"))
         else:
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
+                        # Use lower() for case-insensitive username lookup if your DB is case-sensitive
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
-                        # NOTE: The dummy data in the SQL script below has unhashed passwords.
-                        # For real deployment, all passwords must be hashed.
-                        if user and user["Password"] == password: # Simple comparison for unhashed test data
-                            session["user_role"] = "user"
-                            session["email"] = user["Email"]
-                            return redirect(url_for("dashboard"))
-                        # if user and check_password_hash(user["Password"], password): # Correct check for hashed passwords
-                        #     session["user_role"] = "user"
-                        #     session["email"] = user["Email"]
-                        #     return redirect(url_for("dashboard"))
-                        error = "Invalid credentials."
+                        
+                        if user:
+                            print(f"LOGIN ATTEMPT: User '{username}' found in DB.")
+                            # NOTE: This uses raw password comparison based on the provided SQL setup.
+                            if user["Password"] == password: 
+                                print("LOGIN SUCCESS: Password matched.")
+                                session["user_role"] = "user"
+                                session["email"] = user["Email"]
+                                flash("Login successful!", "success")
+                                print("LOGIN: Session set, redirecting to dashboard.")
+                                return redirect(url_for("dashboard"))
+                            else:
+                                print("LOGIN FAIL: Password mismatch.")
+                                error = "Invalid credentials."
+                        else:
+                            print(f"LOGIN FAIL: User '{username}' not found.")
+                            error = "Invalid credentials."
             except (ValueError, ConnectionError, Exception) as e:
+                # Log critical failure
+                print(f"CRITICAL LOGIN DB ERROR: {e}")
                 error = f"Login failed due to application error: {e}" 
 
     return render_template("login.html", error=error)
+
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -125,9 +136,6 @@ def register():
             flash("Please fill all fields.", "warning")
             return redirect(url_for("register"))
 
-        # NOTE: For test simplicity, we are saving the raw password here. 
-        # In production, use: hashed_password = generate_password_hash(password)
-        # and insert that into the DB.
         raw_password = password 
 
         try:
@@ -143,9 +151,13 @@ def register():
             return redirect(url_for("login"))
             
         except UniqueViolation:
-            flash("Username already taken.", "danger")
+            # This should catch the error if the schema was applied correctly
+            flash("Username or Email already taken.", "danger")
+            print(f"REGISTRATION FAIL: Unique constraint violated for {username} or {email}.")
         except (ValueError, ConnectionError, Exception) as e:
-            flash(f"Registration failed: {e}", "danger")
+            # Catch other potential database errors
+            print(f"REGISTRATION FAIL: DB Error: {e}")
+            flash(f"Registration failed: Database error. {e}", "danger")
 
     return render_template("register.html")
 
@@ -157,6 +169,7 @@ def logout():
 
 @app.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
+    # ... (function remains the same as before)
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         if not email:
@@ -170,7 +183,6 @@ def forgot_password():
                     user = cur.fetchone()
                     if user:
                         temp_password = secrets.token_urlsafe(8)
-                        # In test mode, we update the raw password.
                         cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (temp_password, email))
                         conn.commit()
                         flash(f"Your temporary password is: {temp_password} (Please login and change it)", "success")
@@ -182,7 +194,7 @@ def forgot_password():
         except (ValueError, ConnectionError, Exception) as e:
             flash(f"Password reset failed: Database error. {e}", "danger")
 
-    return render_template("login.html") # Assuming forgot password uses the combined login template
+    return render_template("login.html") 
 
 # -------------------------
 # Dashboard Routes
@@ -202,8 +214,6 @@ def dashboard():
                     print("NOTICE: 'notifications' table not found. Skipping notifications fetch.")
                     notifications = []
 
-                # Fetch only basic environment data for the high-level dashboard view
-                # We need to map boolean types to something readable in the template
                 cur.execute(
                     "SELECT DateTime, Temperature, Humidity, Ammonia, "
                     "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
@@ -224,6 +234,7 @@ def dashboard():
         data=latest_sensor
     )
 
+# ... (Other dashboard routes remain the same) ...
 @app.route("/main_dashboard")
 @login_required 
 def main_dashboard():
@@ -232,7 +243,6 @@ def main_dashboard():
 @app.route("/admin_dashboard")
 @login_required 
 def admin_dashboard():
-    # Security check for admin role
     if session.get("user_role") != "admin":
         flash("Access denied. Admin privileges required.", "danger")
         return redirect(url_for("dashboard"))
@@ -241,7 +251,6 @@ def admin_dashboard():
 @app.route("/manage_users")
 @login_required 
 def manage_users():
-    # Security check for admin role
     if session.get("user_role") != "admin":
         flash("Access denied. Admin privileges required.", "danger")
         return redirect(url_for("dashboard"))
@@ -256,7 +265,7 @@ def report():
 # API Endpoints
 # -------------------------
 
-# Utility function to fetch latest row from a specific table
+# Utility function to fetch latest row from a specific table (same as before)
 def fetch_latest_data(table_name, column_mappings=None):
     """Fetches the latest row from a specified table, handling BOOLEAN to string conversion."""
     try:
@@ -264,7 +273,6 @@ def fetch_latest_data(table_name, column_mappings=None):
             with conn.cursor() as cur:
                 select_parts = []
                 for db_col, api_col in column_mappings.items():
-                    # Handle boolean conversion for all control/light columns
                     if 'light' in db_col.lower() or 'fan' in db_col.lower() or 'control' in db_col.lower() or 'food' in db_col.lower() or 'water' in db_col.lower() or 'conveyor' in db_col.lower() or 'uv' in db_col.lower() or 'sprinkle' in db_col.lower():
                          select_parts.append(f"CASE WHEN {db_col} THEN 'ON' ELSE 'OFF' END AS {api_col}")
                     else:
@@ -272,64 +280,87 @@ def fetch_latest_data(table_name, column_mappings=None):
 
                 select_cols = ", ".join(select_parts)
                 
-                # Fetch all columns if no specific mappings are provided
                 if not column_mappings:
                      select_cols = "*"
 
                 cur.execute(f"SELECT {select_cols} FROM {table_name} ORDER BY DateTime DESC LIMIT 1")
                 return cur.fetchone() or {}
     except OperationalError as oe:
-        # Table not found or schema issue
         print(f"Operational Error in {table_name}: {oe}")
         return {"error": f"Table {table_name} not found or inaccessible."}
     except (ValueError, ConnectionError, Exception) as e:
         print(f"General Error in {table_name}: {e}")
         return {"error": f"Database connection or query failed: {str(e)}"}
 
+
 @app.route("/get_full_sensor_data")
 def get_full_sensor_data():
-    """Aggregates latest data from all sensor tables for the main dashboard."""
     all_data = {}
 
-    # sensordata: Environment
     all_data["environment"] = fetch_latest_data(
         "sensordata",
         {"Temperature": "Temp", "Humidity": "Hum", "Ammonia": "Amm", "Light1": "Light1", "Light2": "Light2", "ExhaustFan": "ExhaustFan", "DateTime": "DateTime"}
     )
     
-    # sensordata1: Food/Water Controls
     all_data["feed_water"] = fetch_latest_data(
         "sensordata1",
         {"Food": "FoodControl", "Water": "WaterControl", "DateTime": "DateTime"}
     )
 
-    # sensordata2: Floor/UV Controls
     all_data["floor_uv"] = fetch_latest_data(
         "sensordata2",
         {"Conveyor": "ConveyorControl", "Sprinkle": "SprinkleControl", "UVLight": "UVControl", "DateTime": "DateTime"}
     )
     
-    # sensordata3: Latest Weight (Simplified, just last record)
     all_data["latest_weight"] = fetch_latest_data(
         "sensordata3",
         {"ChickNumber": "ChickNumber", "Weight": "Weight", "AverageWeight": "AvgWeight", "DateTime": "DateTime"}
     )
     
-    # sensordata4: Level Sensors
     all_data["levels"] = fetch_latest_data(
         "sensordata4",
         {"Water_Level": "WaterLevel", "Food_Level": "FoodLevel", "DateTime": "DateTime"}
     )
 
-    # Check for general database errors
     if any(isinstance(data, dict) and 'error' in data for data in all_data.values()):
-           # If any sub-query failed, return a 500 error
            return jsonify({"error": "Failed to fetch all sensor data", "details": all_data}), 500
 
     return jsonify(all_data)
 
 
-# Retain /get_data and /get_all_data for backward compatibility but use the new utility
+# -------------------------
+# NEW ROUTES TO FIX 404 ERRORS IN LOGS
+# -------------------------
+
+@app.route("/data")
+def get_report_data():
+    """Placeholder for the /data route causing 404 errors."""
+    # Assuming the /data route is used to fetch bulk report data
+    # We will return the same data as /get_all_data for now, or an empty array if not defined.
+    print("WARNING: /data route hit. Using /get_all_data logic as placeholder.")
+    return get_all_data()
+
+@app.route("/sanitization")
+def get_sanitization_status():
+    """Placeholder for the /sanitization route causing 404 errors."""
+    # This route likely fetches controls from sensordata2 (Conveyor, Sprinkle, UVLight)
+    data = fetch_latest_data(
+        "sensordata2",
+        {"Conveyor": "ConveyorControl", "Sprinkle": "SprinkleControl", "UVLight": "UVControl", "DateTime": "DateTime"}
+    )
+    if 'error' in data:
+        return jsonify(data), 500
+    return jsonify(data or {"ConveyorControl": "N/A", "SprinkleControl": "N/A", "UVControl": "N/A"})
+
+
+@app.route("/webcam")
+def get_webcam_feed():
+    """Placeholder for the /webcam route causing 404 errors."""
+    # This route typically returns a stream or a list of images
+    return jsonify({"image_list": [f"/static/shots/{f}" for f in list_shots()]})
+
+
+# Retain /get_data and /get_all_data for backward compatibility
 @app.route("/get_data")
 def get_data():
     data = fetch_latest_data(
@@ -346,7 +377,6 @@ def get_all_data():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Need to explicitly convert BOOLEAN to text/string here for consistency with other endpoints
                 cur.execute(
                     "SELECT DateTime, Temperature, Humidity, Ammonia, "
                     "CASE WHEN Light1 THEN 'ON' ELSE 'OFF' END AS Light1, "
@@ -366,11 +396,10 @@ def get_all_notifications():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Use COALESCE in case message is NULL (though it should be NOT NULL based on user's schema)
                 cur.execute("SELECT DateTime, COALESCE(message, 'N/A') AS message FROM notifications ORDER BY DateTime DESC LIMIT 50")
                 rows = cur.fetchall()
         return jsonify(rows)
-    except (ValueError, ConnectionError, OperationalError) as e: # Catch OperationalError for missing table
+    except (ValueError, ConnectionError, OperationalError) as e:
         print(f"Error in get_all_notifications: {e}")
         return jsonify({"error": "Database connection or query failed", "detail": str(e)}), 500
 
@@ -398,10 +427,8 @@ def insert_notifications():
 # -------------------------
 @app.route("/health")
 def health():
-    # Test database connection for a proper health check
     try:
         with get_db_connection() as conn:
-            # Simple query to check if the connection is alive
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
         return jsonify({"status": "ok", "database": "connected"})
