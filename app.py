@@ -11,13 +11,19 @@ import os
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
-# Load secret key from environment (fallback for local testing)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
+# Secret key (you can also move this to Render later)
+app.secret_key = os.environ.get("SECRET_KEY", "sk-04b6eafca8b7f1a91e6e9d3d8ce8ef2c")
 
 # -------------------------
 # Database setup
 # -------------------------
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://chickencaredb_user:77msJKAINcktZbFKBV60sVbWz6TZhi6d@dpg-d43j492dbo4c73alniv0-a.oregon-postgres.render.com/chickencaredb")
+DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://chickencaredb_user:77msJKAINcktZbFKBV60sVbWz6TZhi6d@dpg-d43j492dbo4c73alniv0-a.oregon-postgres.render.com/chickencaredb"
+)
+
+def get_db():
+    return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
 # Flask-Mail setup
@@ -27,38 +33,36 @@ app.config.update(
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
     MAIL_USERNAME="chickenmonitor1208@gmail.com",
-    MAIL_PASSWORD=os.environ.get("SMTP_PASSWORD"),  # secure!
+    MAIL_PASSWORD=os.environ.get("SMTP_PASSWORD", "leinadloki012"),
 )
-
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
-
-# -------------------------
-# Database helper
-# -------------------------
-def get_db():
-    return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
 # Routes
 # -------------------------
 @app.route("/")
 def home():
-    if "user_id" in session:
+    if "user_role" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
+# -------------------------
+# LOGIN
+# -------------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
 
-        # Admin check
+        # SUPER ADMIN LOGIN
         if email == "admin" and password == "admin":
             session["user_role"] = "admin"
+            flash("Welcome Super Admin!", "success")
             return redirect(url_for("dashboard"))
 
+        # USER LOGIN
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM users WHERE email = %s", (email,))
@@ -67,6 +71,7 @@ def login():
             if user and check_password_hash(user["password"], password):
                 session["user_id"] = user["id"]
                 session["user_role"] = user["role"]
+                flash("Login successful!", "success")
                 return redirect(url_for("dashboard"))
             else:
                 flash("Invalid email or password.", "danger")
@@ -74,14 +79,16 @@ def login():
 
     return render_template("login.html")
 
-
+# -------------------------
+# REGISTER
+# -------------------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
         name = request.form["name"]
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
-        role = "user"  # every new registration is user
+        role = "user"
 
         with get_db() as conn:
             cur = conn.cursor()
@@ -91,26 +98,30 @@ def register():
                     (name, email, password, role),
                 )
                 conn.commit()
-                flash("Account created successfully! Please login.", "success")
+                flash("Registration successful! Please log in.", "success")
                 return redirect(url_for("login"))
             except psycopg.errors.UniqueViolation:
-                flash("Email already registered.", "danger")
                 conn.rollback()
+                flash("This email is already registered.", "danger")
+
     return render_template("register.html")
 
-
+# -------------------------
+# DASHBOARD
+# -------------------------
 @app.route("/dashboard")
 def dashboard():
-    if "user_id" not in session and session.get("user_role") != "admin":
-        flash("Please log in to access dashboard.", "warning")
+    if "user_role" not in session:
+        flash("Please log in first.", "warning")
         return redirect(url_for("login"))
 
-    if session.get("user_role") == "admin":
+    if session["user_role"] == "admin":
         return render_template("admin_dashboard.html")
-    else:
-        return render_template("dashboard.html")
+    return render_template("dashboard.html")
 
-
+# -------------------------
+# LOGOUT
+# -------------------------
 @app.route("/logout")
 def logout():
     session.clear()
@@ -118,7 +129,7 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
-# Forgot Password Flow
+# FORGOT PASSWORD
 # -------------------------
 @app.route("/forgot", methods=["GET", "POST"])
 def forgot_password():
@@ -132,45 +143,48 @@ def forgot_password():
 
         if user:
             token = serializer.dumps(email, salt="reset-password")
-            link = url_for("reset_password", token=token, _external=True)
+            reset_link = url_for("reset_password", token=token, _external=True)
 
             msg = Message(
-                "Password Reset Request - ChickCare",
+                "Password Reset - ChickCare",
                 sender="chickenmonitor1208@gmail.com",
                 recipients=[email],
             )
-            msg.html = render_template("email_reset.html", reset_link=link)
+            msg.html = render_template("email_reset.html", reset_link=reset_link)
             mail.send(msg)
 
-        flash("If registered, password reset instructions have been sent.", "info")
+        flash("If your email is registered, instructions have been sent.", "info")
         return redirect(url_for("login"))
 
     return render_template("forgot.html")
 
-
+# -------------------------
+# RESET PASSWORD
+# -------------------------
 @app.route("/reset/<token>", methods=["GET", "POST"])
 def reset_password(token):
     try:
         email = serializer.loads(token, salt="reset-password", max_age=3600)
-    except (SignatureExpired, BadSignature):
-        flash("The reset link is invalid or expired.", "danger")
+    except SignatureExpired:
+        flash("This reset link has expired.", "danger")
+        return redirect(url_for("forgot_password"))
+    except BadSignature:
+        flash("Invalid reset link.", "danger")
         return redirect(url_for("forgot_password"))
 
     if request.method == "POST":
         new_password = generate_password_hash(request.form["password"])
-
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("UPDATE users SET password = %s WHERE email = %s", (new_password, email))
             conn.commit()
-
-        flash("Password updated! You can now log in.", "success")
+        flash("Password reset successful! Please log in.", "success")
         return redirect(url_for("login"))
 
-    return render_template("reset.html")
+    return render_template("reset.html", token=token)
 
 # -------------------------
-# Run app
+# RUN APP
 # -------------------------
 if __name__ == "__main__":
     app.run(debug=True)
