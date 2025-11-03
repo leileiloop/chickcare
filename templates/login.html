@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login & Reset Forms | Dan Aleko</title>
-  
+  <title>Login | Dan Aleko</title>
+
   <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
   
@@ -52,12 +52,9 @@
     .remember-forgot a { color: #fff; text-decoration: none; }
     .remember-forgot a:hover { text-decoration: underline; }
 
-    .register-link, .forgot-link-group { font-size: 14.5px; text-align: center; margin: 20px 0 15px; }
-    .register-link p a, .forgot-link-group p a { color: #ffcc00; font-weight: 600; text-decoration: none; display: inline-block; margin-top: 5px; }
-    .register-link p a:hover, .forgot-link-group p a:hover { text-decoration: underline; }
-
-    .forgot-info { text-align: center; font-size: 14px; color: rgba(255,255,255,0.8); margin-bottom: 20px; }
-    .hidden { display: none !important; }
+    .register-link { font-size: 14.5px; text-align: center; margin: 20px 0 15px; }
+    .register-link p a { color: #ffcc00; font-weight: 600; text-decoration: none; display: inline-block; margin-top: 5px; }
+    .register-link p a:hover { text-decoration: underline; }
 
     /* Flask Flash Messages */
     .flash-message { padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 14px; font-weight: 500; color: #fff; }
@@ -70,91 +67,36 @@
 
 <div class="wrapper">
 
-  <!-- LOGIN FORM -->
-  <div id="loginForm" class="form-container">
-    <h1>Login</h1>
+  <h1>Login</h1>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
 
-    <form method="post" action="{{ url_for('login') }}">
-      <div class="input-box">
-        <input type="text" name="username" placeholder="Username" required>
-        <i class='bx bxs-user'></i>
-      </div>
-      <div class="input-box">
-        <input type="password" name="password" placeholder="Password" required>
-        <i class='bx bxs-lock-alt'></i>
-      </div>
-      <div class="remember-forgot">
-        <label><input type="checkbox" name="remember"> Remember me</label>
-        <a href="#" id="showForgotPassword">Forgot Password?</a>
-      </div>
-      <button type="submit" class="btn">Login</button>
-      <div class="register-link">
-        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
-      </div>
-    </form>
-  </div>
-
-  <!-- FORGOT PASSWORD FORM (Hidden by Default) -->
-  <div id="forgotPasswordForm" class="form-container hidden">
-    <h1>Reset Password</h1>
-    <p class="forgot-info">Enter your email to receive a password reset link.</p>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <form method="post" action="{{ url_for('forgot_password') }}">
-      <div class="input-box">
-        <input type="email" name="email" placeholder="Email Address" required>
-        <i class='bx bxs-envelope'></i>
-      </div>
-      <button type="submit" class="btn btn-yellow">Send Reset Link</button>
-      <div class="forgot-link-group">
-        <p>Remembered your password? <a href="#" id="showLoginFromForgot">Back to Login</a></p>
-        <p>Need an account? <a href="{{ url_for('register') }}" style="color: rgba(255,255,255,0.8); font-weight: 400;">Register</a></p>
-      </div>
-    </form>
-  </div>
+  <form method="post" action="{{ url_for('login') }}">
+    <div class="input-box">
+      <input type="text" name="email" placeholder="Email" required>
+      <i class='bx bxs-user'></i>
+    </div>
+    <div class="input-box">
+      <input type="password" name="password" placeholder="Password" required>
+      <i class='bx bxs-lock-alt'></i>
+    </div>
+    <div class="remember-forgot">
+      <label><input type="checkbox" name="remember"> Remember me</label>
+      <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+    </div>
+    <button type="submit" class="btn">Login</button>
+    <div class="register-link">
+      <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+    </div>
+  </form>
 
 </div>
-
-<script>
-  const loginForm = document.getElementById('loginForm');
-  const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-  const showForgotPasswordLink = document.getElementById('showForgotPassword');
-  const showLoginFromForgotLink = document.getElementById('showLoginFromForgot');
-
-  function showForm(formToShow) {
-    if(formToShow === 'forgot') {
-      loginForm.classList.add('hidden');
-      forgotPasswordForm.classList.remove('hidden');
-    } else {
-      loginForm.classList.remove('hidden');
-      forgotPasswordForm.classList.add('hidden');
-    }
-  }
-
-  showForgotPasswordLink.addEventListener('click', e => { e.preventDefault(); showForm('forgot'); });
-  showLoginFromForgotLink.addEventListener('click', e => { e.preventDefault(); showForm('login'); });
-
-  // Show forgot password if redirected to forgot_password route
-  window.onload = function() {
-    const urlPath = window.location.pathname;
-    if(urlPath.includes('forgot_password')) { showForm('forgot'); }
-  };
-</script>
 
 </body>
 </html>
