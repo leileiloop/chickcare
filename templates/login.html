@@ -22,8 +22,8 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      /* Simulating the dark, blurred background from your register page */
-      background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+      /* FIX: Using the Flask url_for for the background image, consistent with the register form */
+      background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat;
       background-size: cover;
       background-position: center;
       padding: 20px;
