@@ -4,336 +4,151 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login & Reset Forms | Dan Aleko</title>
-  <!-- Load Boxicons for icons -->
+  <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-  <!-- Load Poppins font -->
+  <!-- Poppins Font -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
-    /* ====================== Login & Forgot Form Design (Based on Register) ========================== */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Poppins", sans-serif;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Poppins", sans-serif; }
     body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      /* FIX: Using the Flask url_for for the background image, consistent with the register form */
-      background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat;
-      background-size: cover;
-      background-position: center;
+      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+      background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat center center/cover;
       padding: 20px;
     }
     .wrapper {
-      width: 420px;
-      max-width: 100%;
+      width: 420px; max-width: 100%;
       background: transparent;
       border: 2px solid rgba(255, 255, 255, .2);
       backdrop-filter: blur(60px);
       color: #fff;
       border-radius: 12px;
       padding: 30px 40px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, .5);
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
     }
-    .wrapper h1 {
-      font-size: 36px;
-      text-align: center;
-    }
-    .wrapper .input-box {
-      position: relative;
-      width: 100%;
-      height: 50px;
-      margin: 30px 0;
-    }
+    h1 { text-align: center; font-size: 36px; }
+    .input-box { position: relative; width: 100%; height: 50px; margin: 30px 0; }
     .input-box input {
-      width: 100%;
-      height: 100%;
-      background: transparent;
-      border: none;
-      outline: none;
-      border: 2px solid rgba(255, 255, 255, .2);
-      border-radius: 40px;
-      font-size: 16px;
-      color: #fff;
-      padding: 20px 45px 20px 20px;
+      width: 100%; height: 100%;
+      background: transparent; border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 40px; padding: 20px 45px 20px 20px;
+      font-size: 16px; color: #fff; outline: none;
     }
-    .input-box input::placeholder {
-      color: rgba(255, 255, 255, 0.7);
-    }
-    .input-box i {
-      position: absolute;
-      right: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 20px;
-    }
-    .wrapper .btn {
-      width: 100%;
-      height: 45px;
-      background: #fff; /* Default for Login button */
-      border: none;
-      outline: none;
-      border-radius: 40px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, .1);
-      cursor: pointer;
-      font-size: 16px;
-      color: #333;
-      font-weight: 600;
+    .input-box input::placeholder { color: rgba(255,255,255,0.7); }
+    .input-box i { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 20px; }
+    .btn { width: 100%; height: 45px; background: #fff; border: none; border-radius: 40px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 16px; color: #333; font-weight: 600;
       transition: background 0.3s;
     }
-    .wrapper .btn:hover {
-        background: #eee;
-    }
-    /* Specific style for the Reset Password button (yellow/accent) */
-    .wrapper .btn-yellow {
-        background: #ffcc00;
-        color: #1f2937;
-    }
-    .wrapper .btn-yellow:hover {
-        background: #ffdb4d;
-    }
-    .wrapper .remember-forgot {
-        display: flex;
-        justify-content: space-between;
-        font-size: 14.5px;
-        margin: -15px 0 15px;
-    }
-    .remember-forgot label input {
-        accent-color: #fff;
-        margin-right: 3px;
-    }
-    .remember-forgot a {
-        color: #fff;
-        text-decoration: none;
-    }
-    .remember-forgot a:hover {
-        text-decoration: underline;
-    }
+    .btn:hover { background: #eee; }
+    .btn-yellow { background: #ffcc00; color: #1f2937; }
+    .btn-yellow:hover { background: #ffdb4d; }
+    .remember-forgot { display: flex; justify-content: space-between; font-size: 14.5px; margin: -15px 0 15px; }
+    .remember-forgot label input { accent-color: #fff; margin-right: 3px; }
+    .remember-forgot a { color: #fff; text-decoration: none; }
+    .remember-forgot a:hover { text-decoration: underline; }
+    .register-link, .forgot-link-group { font-size: 14.5px; text-align: center; margin: 20px 0 15px; }
+    .register-link p a, .forgot-link-group p a { color: #ffcc00; font-weight: 600; text-decoration: none; display: inline-block; margin-top: 5px; }
+    .register-link p a:hover, .forgot-link-group p a:hover { text-decoration: underline; }
+    .forgot-info { text-align: center; font-size: 14px; color: rgba(255,255,255,0.8); margin-bottom: 20px; }
+    .hidden { display: none !important; }
 
-    .wrapper .register-link,
-    .wrapper .forgot-link-group {
-      font-size: 14.5px;
-      text-align: center;
-      margin: 20px 0 15px;
-    }
-    .register-link p a,
-    .forgot-link-group p a {
-      color: #ffcc00; /* Yellow for links */
-      text-decoration: none;
-      font-weight: 600;
-      display: inline-block;
-      margin-top: 5px;
-    }
-    .register-link p a:hover,
-    .forgot-link-group p a:hover {
-      text-decoration: underline;
-    }
-    .forgot-info {
-        text-align: center;
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.8);
-        margin-bottom: 20px;
-    }
-
-    /* Flask Flash Message Styles */
-    .flash-message {
-        padding: 10px;
-        margin-bottom: 20px;
-        border-radius: 5px;
-        font-size: 14px;
-        font-weight: 500;
-        color: #fff;
-    }
+    /* Flask Flash Messages */
+    .flash-message { padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 14px; font-weight: 500; color: #fff; }
     .flash-success { background-color: #10b981; border: 1px solid #047857; }
     .flash-danger { background-color: #ef4444; border: 1px solid #b91c1c; }
     .flash-warning { background-color: #f59e0b; border: 1px solid #d97706; }
-
-
-
-
-
   </style>
 </head>
 <body>
 
-  <!-- Main Wrapper -->
-  <div class="wrapper">
+<div class="wrapper">
 
-    <!-- LOGIN FORM (Default View) -->
-    <div id="loginForm" class="form-container">
-      <h1>Login</h1>
+  <!-- LOGIN FORM -->
+  <div id="loginForm" class="form-container">
+    <h1>Login</h1>
 
-      <!-- START: Flask Flash Message Logic -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash-message {{ 'flash-' + category }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-      {% endwith %}
-      <!-- END: Flask Flash Message Logic -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-      <form method="post" action="{{ url_for('login') }}">
-        <!-- Username Input -->
-        <div class="input-box">
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            required
-          >
-          <i class='bx bxs-user'></i>
-        </div>
-
-        <!-- Password Input -->
-        <div class="input-box">
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            required
-          >
-          <i class='bx bxs-lock-alt'></i>
-        </div>
-
-        <!-- Remember Me & Forgot Password -->
-        <div class="remember-forgot">
-          <label>
-            <input type="checkbox" name="remember">
-            Remember me
-          </label>
-
-          <a href="#" id="showForgotPassword">
-            Forgot Password?
-          </a>
-        </div>
-
-        <!-- Login Button -->
-        <button
-          type="submit"
-          class="btn"
-        >
-          Login
-        </button>
-
-        <!-- Register Link -->
-        <div class="register-link">
-          <p>Don't have an account?
-            <a href="{{ url_for('register') }}">
-              Register
-            </a>
-          </p>
-        </div>
-      </form>
-    </div>
-
-    <!-- FORGOT PASSWORD FORM (Hidden by Default) -->
-    <div id="forgotPasswordForm" class="form-container hidden">
-      <h1>Reset Password</h1>
-      <p class="forgot-info">
-          Enter your email to receive a password reset link.
-      </p>
-
-      <!-- START: Flask Flash Message Logic for Forgot Password -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash-message {{ 'flash-' + category }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-      {% endwith %}
-      <!-- END: Flask Flash Message Logic -->
-
-      <form method="post" action="{{ url_for('forgot_password') }}">
-        <!-- Email Input -->
-        <div class="input-box">
-          <input
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            required
-          >
-          <i class='bx bxs-envelope'></i>
-        </div>
-
-        <!-- Submit Button -->
-        <button
-          type="submit"
-          class="btn btn-yellow"
-        >
-          Send Reset Link
-        </button>
-
-        <!-- Back to Login/Register Links -->
-        <div class="forgot-link-group">
-          <p>Remembered your password?
-            <!-- This is the JavaScript client-side switch -->
-            <a href="#" id="showLoginFromForgot">
-              Back to Login
-            </a>
-          </p>
-          <p>Need an account?
-            <a href="{{ url_for('register') }}" style="color: rgba(255, 255, 255, 0.8); font-weight: 400;">
-              Register
-            </a>
-          </p>
-        </div>
-      </form>
-    </div>
-
+    <form method="post" action="{{ url_for('login') }}">
+      <div class="input-box">
+        <input type="text" name="username" placeholder="Username" required>
+        <i class='bx bxs-user'></i>
+      </div>
+      <div class="input-box">
+        <input type="password" name="password" placeholder="Password" required>
+        <i class='bx bxs-lock-alt'></i>
+      </div>
+      <div class="remember-forgot">
+        <label><input type="checkbox" name="remember"> Remember me</label>
+        <a href="#" id="showForgotPassword">Forgot Password?</a>
+      </div>
+      <button type="submit" class="btn">Login</button>
+      <div class="register-link">
+        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+      </div>
+    </form>
   </div>
 
-  <script>
-    // === Form Toggling Logic ===
-    const loginForm = document.getElementById('loginForm');
-    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-    const showForgotPasswordLink = document.getElementById('showForgotPassword');
-    const showLoginFromForgotLink = document.getElementById('showLoginFromForgot');
+  <!-- FORGOT PASSWORD FORM (Hidden by Default) -->
+  <div id="forgotPasswordForm" class="form-container hidden">
+    <h1>Reset Password</h1>
+    <p class="forgot-info">Enter your email to receive a password reset link.</p>
 
-    /**
-     * Toggles the visibility between the login and forgot password forms.
-     * @param {string} formToShow - 'login' or 'forgot'
-     */
-    function showForm(formToShow) {
-        if (formToShow === 'forgot') {
-            loginForm.classList.add('hidden');
-            forgotPasswordForm.classList.remove('hidden');
-        } else {
-            loginForm.classList.remove('hidden');
-            forgotPasswordForm.classList.add('hidden');
-        }
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('forgot_password') }}">
+      <div class="input-box">
+        <input type="email" name="email" placeholder="Email Address" required>
+        <i class='bx bxs-envelope'></i>
+      </div>
+      <button type="submit" class="btn btn-yellow">Send Reset Link</button>
+      <div class="forgot-link-group">
+        <p>Remembered your password? <a href="#" id="showLoginFromForgot">Back to Login</a></p>
+        <p>Need an account? <a href="{{ url_for('register') }}" style="color: rgba(255,255,255,0.8); font-weight: 400;">Register</a></p>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+  const loginForm = document.getElementById('loginForm');
+  const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+  const showForgotPasswordLink = document.getElementById('showForgotPassword');
+  const showLoginFromForgotLink = document.getElementById('showLoginFromForgot');
+
+  function showForm(formToShow) {
+    if(formToShow === 'forgot') {
+      loginForm.classList.add('hidden');
+      forgotPasswordForm.classList.remove('hidden');
+    } else {
+      loginForm.classList.remove('hidden');
+      forgotPasswordForm.classList.add('hidden');
     }
+  }
 
-    // Event listeners to switch forms
-    showForgotPasswordLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        showForm('forgot');
-    });
+  showForgotPasswordLink.addEventListener('click', e => { e.preventDefault(); showForm('forgot'); });
+  showLoginFromForgotLink.addEventListener('click', e => { e.preventDefault(); showForm('login'); });
 
+  // If the user is redirected to forgot_password route, show the form
+  window.onload = function() {
+    const urlPath = window.location.pathname;
+    if(urlPath.includes('forgot_password')) { showForm('forgot'); }
+  };
+</script>
 
-    showLoginFromForgotLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        showForm('login');
-    });
-
-    // Determine which form to show on page load based on the route or flash messages
-
-    window.onload = function() {
-        const urlPath = window.location.pathname;
-        if (urlPath.includes('forgot_password')) {
-            // If the user was redirected to forgot_password (e.g., if submission failed)
-            showForm('forgot');
-        }
-    };
-
-  </script>
 </body>
 </html>
