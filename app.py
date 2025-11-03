@@ -126,8 +126,12 @@ def register():
                         (email, username, hashed_password)
                     )
                 conn.commit()
+            
+            # --- THIS IS THE CRITICAL LOGIC ---
             flash("Registration successful. Please login.", "success")
             return redirect(url_for("login"))
+            # -----------------------------------
+            
         except UniqueViolation:
             flash("Username already taken.", "danger")
         except (ValueError, ConnectionError, Exception) as e:
