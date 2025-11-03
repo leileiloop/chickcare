@@ -90,9 +90,11 @@ def register():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Ensure role column exists
+                    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
                     cur.execute(
                         "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
-                        (email, username, hashed, "user")  # default role
+                        (email, username, hashed, "user")
                     )
                 conn.commit()
 
