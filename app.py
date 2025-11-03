@@ -42,7 +42,10 @@ def login_required(view):
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Always clear old session when visiting login page
+    session.clear()
     error = None
+
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
@@ -50,7 +53,6 @@ def login():
         if not username or not password:
             error = "Provide username and password."
         elif username.lower() == "admin" and password == "admin":
-            session.clear()
             session["user_role"] = "admin"
             session["email"] = "admin@domain.com"
             flash("Admin logged in.", "success")
@@ -62,7 +64,6 @@ def login():
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
-                            session.clear()
                             session["user_role"] = "user"
                             session["email"] = user["Email"]
                             flash("Login successful.", "success")
@@ -129,6 +130,7 @@ def forgot_password():
                     user = cur.fetchone()
                     if user:
                         token = secrets.token_urlsafe(16)
+                        # Ensure column exists
                         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
@@ -172,7 +174,7 @@ def reset_password(token):
             flash(f"Failed to reset password: {e}", "danger")
             return redirect(url_for("forgot_password"))
 
-    return render_template("reset_password.html")
+    return render_template("reset_password.html", token=token)
 
 # -------------------------
 # Dashboard
@@ -183,7 +185,6 @@ def dashboard():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Example: get latest environment data
                 cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 10")
                 env_data = cur.fetchall()
 
