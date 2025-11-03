@@ -10,12 +10,10 @@ import os
 # Flask app setup
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-
-# Secret key (you can also move this to Render later)
 app.secret_key = os.environ.get("SECRET_KEY", "sk-04b6eafca8b7f1a91e6e9d3d8ce8ef2c")
 
 # -------------------------
-# Database setup
+# Database setup (reference)
 # -------------------------
 DB_URL = os.environ.get(
     "DATABASE_URL",
@@ -39,12 +37,23 @@ mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------------
+# Helper: login required
+# -------------------------
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_role" not in session:
+            flash("Please log in first.", "warning")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+# -------------------------
 # Routes
 # -------------------------
 @app.route("/")
 def home():
-    if "user_role" in session:
-        return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
 # -------------------------
@@ -62,7 +71,6 @@ def login():
             flash("Welcome Super Admin!", "success")
             return redirect(url_for("dashboard"))
 
-        # USER LOGIN
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM users WHERE email = %s", (email,))
@@ -107,17 +115,49 @@ def register():
     return render_template("register.html")
 
 # -------------------------
-# DASHBOARD
+# DASHBOARD ROUTES
 # -------------------------
 @app.route("/dashboard")
+@login_required
 def dashboard():
-    if "user_role" not in session:
-        flash("Please log in first.", "warning")
-        return redirect(url_for("login"))
-
     if session["user_role"] == "admin":
-        return render_template("admin_dashboard.html")
+        return render_template("admin-dashboard.html")
     return render_template("dashboard.html")
+
+@app.route("/main-dashboard")
+@login_required
+def main_dashboard():
+    return render_template("main-dashboard.html")
+
+@app.route("/environment")
+@login_required
+def environment():
+    return render_template("environment.html")
+
+@app.route("/feed")
+@login_required
+def feed():
+    return render_template("feed.html")
+
+@app.route("/growth")
+@login_required
+def growth():
+    return render_template("growth.html")
+
+@app.route("/manage-users")
+@login_required
+def manage_users():
+    return render_template("manage-users.html")
+
+@app.route("/report")
+@login_required
+def report():
+    return render_template("report.html")
+
+@app.route("/sanitization")
+@login_required
+def sanitization():
+    return render_template("sanitization.html")
 
 # -------------------------
 # LOGOUT
@@ -135,7 +175,6 @@ def logout():
 def forgot_password():
     if request.method == "POST":
         email = request.form["email"]
-
         with get_db() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM users WHERE email = %s", (email,))
@@ -144,13 +183,12 @@ def forgot_password():
         if user:
             token = serializer.dumps(email, salt="reset-password")
             reset_link = url_for("reset_password", token=token, _external=True)
-
             msg = Message(
                 "Password Reset - ChickCare",
                 sender="chickenmonitor1208@gmail.com",
                 recipients=[email],
             )
-            msg.html = render_template("email_reset.html", reset_link=reset_link)
+            msg.html = render_template("reset_password.html", reset_link=reset_link)
             mail.send(msg)
 
         flash("If your email is registered, instructions have been sent.", "info")
@@ -181,7 +219,7 @@ def reset_password(token):
         flash("Password reset successful! Please log in.", "success")
         return redirect(url_for("login"))
 
-    return render_template("reset.html", token=token)
+    return render_template("reset_password.html", token=token)
 
 # -------------------------
 # RUN APP
