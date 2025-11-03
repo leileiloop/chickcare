@@ -2,25 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications</title>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* FIX: Added necessary styles for the notification dropdown to position correctly */
+        .notifi-box {
+            position: absolute;
+            top: 60px; /* Aligned below the topbar */
+            right: 20px;
+            width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--white); /* Assuming a white background */
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            padding: 10px;
+            display: none; /* Hidden by default */
+        }
+        .notifi-box.active {
+            display: block;
+        }
+        .notifi-box h2 {
+            font-size: 1.2em;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .notifi-item .text {
+            padding: 5px 0;
+            border-bottom: 1px dashed #ddd;
+            font-size: 0.9em;
+        }
+        .notifi-item .text:last-child {
+            border-bottom: none;
+        }
+        .notification-date {
+            display: block;
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 2px;
+        }
+    </style>
 </head>
 
 <body>
-        <div class="container">
+    <div class="container">
         <div class="navigation">
             <ul>
                 <li>
-                                        <a href="{{ url_for('dashboard') }}"> 
+                    <a href="{{ url_for('dashboard') }}"> 
                         <span class="icon">
-                            <img src="{{ url_for('static', filename='imgs/CC.png') }}">
+                            <img src="{{ url_for('static', filename='imgs/CC.png') }}" alt="Chick Care Logo">
                         </span>
                         <span class="title1">Chick Care</span>
                     </a>
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('main_dashboard') }}">
+                    <a href="{{ url_for('main_dashboard') }}">
                         <span class="icon">
                             <ion-icon name="reorder-four-outline"></ion-icon>
                         </span>
@@ -29,7 +71,7 @@
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('webcam') }}">
+                    <a href="{{ url_for('webcam') }}">
                         <span class="icon">
                             <ion-icon name="stats-chart-outline"></ion-icon>
                         </span>
@@ -38,7 +80,7 @@
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('feeding') }}">
+                    <a href="{{ url_for('feeding') }}">
                         <span class="icon">
                             <ion-icon name="layers-outline"></ion-icon>
                         </span>
@@ -47,7 +89,7 @@
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('environment') }}">
+                    <a href="{{ url_for('environment') }}">
                         <span class="icon">
                             <ion-icon name="cloudy-outline"></ion-icon>
                         </span>
@@ -55,8 +97,8 @@
                     </a>
                 </li>
 
-                <li>
-                                        <a href="{{ url_for('dashboard') }}">
+                <li class="active-link">
+                    <a href="{{ url_for('notifications') }}">
                         <span class="icon">
                             <ion-icon name="notifications-circle-outline"></ion-icon>
                         </span>
@@ -65,7 +107,7 @@
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('sanitization') }}">
+                    <a href="{{ url_for('sanitization') }}">
                         <span class="icon">
                             <ion-icon name="water-outline"></ion-icon>
                         </span>
@@ -73,9 +115,9 @@
                     </a>
                 </li>
 
-                                {% if session.get('user_role') == 'admin' %}
+                {% if session.get('user_role') == 'admin' %}
                 <li>
-                                        <a href="{{ url_for('manage_users') }}">
+                    <a href="{{ url_for('manage_users') }}">
                         <span class="icon">
                             <ion-icon name="people-outline"></ion-icon>
                         </span>
@@ -85,7 +127,7 @@
                 {% endif %}
 
                 <li>
-                                        <a href="{{ url_for('report') }}">
+                    <a href="{{ url_for('report') }}">
                         <span class="icon">
                             <ion-icon name="file-tray-stacked-outline"></ion-icon>
                         </span>
@@ -94,7 +136,7 @@
                 </li>
 
                 <li>
-                                        <a href="{{ url_for('logout') }}">
+                    <a href="{{ url_for('logout') }}">
                         <span class="icon">
                             <ion-icon name="log-out-outline"></ion-icon>
                         </span>
@@ -104,7 +146,7 @@
             </ul>
         </div>
 
-                <div class="main">
+        <div class="main">
             <div class="topbar">
                 <div class="toggle">
                     <ion-icon name="menu-outline"></ion-icon>
@@ -115,25 +157,20 @@
                 </div>
 
 		       <div class="iconn" onclick="toggleNotifi()">
-			    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt=""> 
+			    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="Notification Bell"> 
                 <span id="notificationCount">0</span>
 		        </div>
 		        <div class="notifi-box" id="box">
 			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
-
-				    <div class="text" id="notificationItems">
-
+			        <div class="notifi-item">
+				        <div class="text" id="notificationItems">
+                        <!-- Notifications content will be injected here -->
 			        </div>
-			    </div>
-
-
+			        </div>
 		        </div>
 
-
-
                 <div class="user">
-                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="">
+                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="User Profile Image">
                 </div>
             </div>
 
@@ -150,17 +187,111 @@
                     <th>Message</th>
                 </tr>
             </thead>
-            <tbody>
-                        </tbody>
+            <tbody id="notificationTableBody">
+                    <!-- Table rows will be dynamically populated here -->
+            </tbody>
         </table>
     </div>
 
 </div>
     </div>
 
-        <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-        <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-</body>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <script>
+        const notifiBox = document.getElementById('box');
+        const countSpans = [document.getElementById('notificationCount'), document.getElementById('notificationCount1')];
+        const tableBody = document.getElementById('notificationTableBody');
+        const dropdownItems = document.getElementById('notificationItems');
 
+        // FIX 1: Function to show/hide the notification dropdown
+        function toggleNotifi() {
+            notifiBox.classList.toggle('active');
+        }
+
+        // FIX 2: Function to fetch and display notifications
+        async function fetchNotifications() {
+            try {
+                // Assuming your Flask backend serves notifications at this route
+                const response = await fetch('{{ url_for("get_all_notifications") }}');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const notifications = await response.json();
+                
+                // Clear existing content
+                tableBody.innerHTML = '';
+                dropdownItems.innerHTML = '';
+
+                if (notifications.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: #888;">No recent notifications.</td></tr>';
+                    dropdownItems.innerHTML = '<p style="text-align: center; color: #888;">No new alerts.</p>';
+                    countSpans.forEach(span => span.textContent = '0');
+                    return;
+                }
+
+                const count = notifications.length;
+                countSpans.forEach(span => span.textContent = count);
+
+                // Populate main table
+                notifications.forEach(notif => {
+                    const row = tableBody.insertRow();
+                    // Assuming 'DateTime' and 'message' keys from your Python/SQL data
+                    row.insertCell().textContent = new Date(notif.DateTime).toLocaleString(); 
+                    row.insertCell().textContent = notif.message;
+                });
+
+                // Populate dropdown (limiting to top 5)
+                notifications.slice(0, 5).forEach(notif => {
+                    const item = document.createElement('div');
+                    item.className = 'notification-item-text';
+                    item.innerHTML = `
+                        <p>${notif.message}</p>
+                        <span class="notification-date">${new Date(notif.DateTime).toLocaleString()}</span>
+                    `;
+                    dropdownItems.appendChild(item);
+                });
+
+            } catch (error) {
+                console.error("Error fetching notifications:", error);
+                // Display error message in the table and dropdown
+                tableBody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: red;">Error loading data.</td></tr>';
+                dropdownItems.innerHTML = '<p style="text-align: center; color: red;">Failed to load alerts.</p>';
+                countSpans.forEach(span => span.textContent = '!');
+            }
+        }
+
+        // FIX 3: Function to update the date and time display
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('displayDateTime').textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        // FIX 4: Function to toggle the navigation sidebar
+        function toggleMenu() {
+            const container = document.querySelector('.container');
+            container.classList.toggle('active'); // Assuming 'active' class controls the sidebar state
+        }
+
+
+        // Event listeners and initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            // Attach toggle function to the menu icon
+            document.querySelector('.toggle').addEventListener('click', toggleMenu);
+            
+            // Initial load of data and time
+            updateDateTime();
+            fetchNotifications();
+
+            // Set up real-time updates for time and data
+            setInterval(updateDateTime, 1000); // Update time every second
+            setInterval(fetchNotifications, 15000); // Update data every 15 seconds (adjust as needed)
+        });
+
+    </script>
+</body>
 </html>
