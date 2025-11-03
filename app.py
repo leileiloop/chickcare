@@ -27,6 +27,46 @@ def get_db_connection():
         raise ConnectionError(f"Database connection failed: {e}")
 
 # -------------------------
+# Email Configuration
+# -------------------------
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_EMAIL = "chickenmonitor1208@gmail.com"
+SMTP_PASSWORD = "leinadloki012"
+
+def send_reset_email(to_email, token):
+    reset_link = f"http://127.0.0.1:8080/reset_password/{token}"  # Update if deployed
+    subject = "ChickenCare Password Reset Request"
+
+    html_content = f"""
+    <html>
+        <body>
+            <p>Hello,</p>
+            <p>We received a request to reset your password for your ChickenCare account.</p>
+            <p>Click the link below to reset your password:</p>
+            <p><a href="{reset_link}" style="padding:10px 20px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:5px;">Reset Password</a></p>
+            <p>If you did not request a password reset, you can ignore this email.</p>
+            <br>
+            <p>Thanks,<br>ChickenCare Team</p>
+        </body>
+    </html>
+    """
+
+    msg = MIMEText(html_content, "html")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_EMAIL
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.sendmail(SMTP_EMAIL, to_email, msg.as_string())
+            print(f"Reset email sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send reset email: {e}")
+
+# -------------------------
 # Decorators
 # -------------------------
 def login_required(role=None):
@@ -42,57 +82,6 @@ def login_required(role=None):
             return view(**kwargs)
         return wrapped_view
     return decorator
-
-# -------------------------
-# Super Admin Creation
-# -------------------------
-def create_admin_user():
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
-                cur.execute("SELECT * FROM users WHERE Username=%s", ("admin",))
-                admin_user = cur.fetchone()
-                if not admin_user:
-                    hashed = generate_password_hash("admin")
-                    cur.execute(
-                        "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
-                        ("admin@example.com", "admin", hashed, "admin")
-                    )
-                    conn.commit()
-                    print("Super admin account created: admin/admin")
-                else:
-                    print("Super admin already exists.")
-    except Exception as e:
-        print(f"Failed to create super admin: {e}")
-
-create_admin_user()
-
-# -------------------------
-# Email Config for Password Reset
-# -------------------------
-SMTP_EMAIL = "chickenmonitor1208@gmail.com"
-SMTP_PASSWORD = "leinadloki012"
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-
-def send_reset_email(to_email, token):
-    reset_link = f"http://127.0.0.1:8080/reset_password/{token}"
-    subject = "Password Reset Request"
-    body = f"Click the link to reset your password:\n\n{reset_link}"
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = SMTP_EMAIL
-    msg["To"] = to_email
-
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.sendmail(SMTP_EMAIL, to_email, msg.as_string())
-            print(f"Reset email sent to {to_email}")
-    except Exception as e:
-        print(f"Failed to send reset email: {e}")
 
 # -------------------------
 # Authentication Routes
@@ -111,6 +100,17 @@ def login():
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
+                        # Super admin auto creation
+                        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
+                        cur.execute("SELECT * FROM users WHERE Username=%s", ("admin",))
+                        admin_user = cur.fetchone()
+                        if not admin_user:
+                            hashed_admin = generate_password_hash("admin")
+                            cur.execute("INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
+                                        ("admin@chickencare.com", "admin", hashed_admin, "admin"))
+                            conn.commit()
+
+                        # Normal login
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
                         user = cur.fetchone()
                         if user and check_password_hash(user["Password"], password):
@@ -124,6 +124,7 @@ def login():
             except Exception as e:
                 error = f"Login failed: {e}"
                 print(f"LOGIN ERROR: {e}")
+
     return render_template("login.html", error=error)
 
 @app.route("/register", methods=["GET", "POST"])
@@ -141,12 +142,14 @@ def register():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'")
                     cur.execute(
                         "INSERT INTO users (Email, Username, Password, role) VALUES (%s, %s, %s, %s)",
                         (email, username, hashed, "user")
                     )
                 conn.commit()
 
+            # Auto login after registration
             session.clear()
             session["user_role"] = "user"
             session["email"] = email
@@ -181,15 +184,15 @@ def forgot_password():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                     cur.execute("SELECT * FROM users WHERE Email=%s", (email,))
                     user = cur.fetchone()
                     if user:
                         token = secrets.token_urlsafe(16)
-                        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT")
                         cur.execute("UPDATE users SET reset_token=%s WHERE Email=%s", (token, email))
                         conn.commit()
                         send_reset_email(email, token)
-                        flash("Password reset link sent! Check your email.", "success")
+                        flash("Password reset email sent. Check your inbox.", "success")
                         return redirect(url_for("login"))
                     else:
                         flash("If registered, password reset instructions sent.", "info")
