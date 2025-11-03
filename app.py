@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request, session, flash, redirect, url_for
 import psycopg
 from psycopg.rows import dict_row
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UniqueViolation, OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import secrets
@@ -15,14 +15,24 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")  # Change in pro
 # -------------------------
 # PostgreSQL Configuration
 # -------------------------
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://tiny_idu0_user:zh1wVHlmK2WgGxBQ2VfejYtBZrRgZe63@dpg-d433n5ali9vc73cieobg-a.oregon-postgres.render.com:5432/tiny_idu0"
-)
+# CRITICAL: For deployment on Render, the DATABASE_URL environment variable MUST be set
+# to the External Database URL of your PostgreSQL service. 
+# We explicitly rely on the environment variable, providing None as a local fallback
+# which will immediately fail with a clear message if run locally without setup.
+DATABASE_URL = os.environ.get("DATABASE_URL") 
 
 def get_db_connection():
-    """Connect to PostgreSQL with SSL."""
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row, sslmode="require")
+    """Connect to PostgreSQL with SSL. Raises a clear error if DATABASE_URL is not set or connection fails."""
+    if not DATABASE_URL:
+        # This provides a clear error instead of the ambiguous 'NoneType' crash.
+        raise ValueError("DATABASE_URL environment variable is not set. Cannot establish database connection.")
+    
+    # Ensure sslmode="require" is used, which is mandatory for Render PostgreSQL.
+    try:
+        return psycopg.connect(DATABASE_URL, row_factory=dict_row, sslmode="require")
+    except OperationalError as e:
+        # Catch specific psycopg connection errors (like wrong URL, host unreachable)
+        raise ConnectionError(f"Database connection failed: Check the DATABASE_URL value and network access. Details: {e}")
 
 # -------------------------
 # Utility Functions
@@ -53,6 +63,7 @@ def login():
             return redirect(url_for("dashboard"))
         else:
             try:
+                # Connection attempt happens here ⬇️
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
                         cur.execute("SELECT * FROM users WHERE Username=%s", (username,))
@@ -62,8 +73,9 @@ def login():
                             session["email"] = user["Email"]
                             return redirect(url_for("dashboard"))
                         error = "Invalid credentials."
-            except Exception as e:
-                error = f"Database error: {e}"
+            except (ValueError, ConnectionError, Exception) as e:
+                # Catch configuration or connection errors and display them
+                error = f"Login failed due to application error: {e}" 
 
     return render_template("login.html", error=error)
 
@@ -91,8 +103,8 @@ def register():
             return redirect(url_for("login"))
         except UniqueViolation:
             flash("Username already taken.", "danger")
-        except Exception as e:
-            flash(f"Database error: {e}", "danger")
+        except (ValueError, ConnectionError, Exception) as e:
+            flash(f"Registration failed: {e}", "danger")
 
     return render_template("register.html")
 
@@ -120,12 +132,13 @@ def forgot_password():
                         hashed_temp = generate_password_hash(temp_password)
                         cur.execute("UPDATE users SET Password=%s WHERE Email=%s", (hashed_temp, email))
                         conn.commit()
+                        # NOTE: In a real app, you would send this via email.
                         flash(f"Your temporary password is: {temp_password}", "success")
                         return redirect(url_for("login"))
                     else:
                         flash("Email not found.", "danger")
-        except Exception as e:
-            flash(f"Database error: {e}", "danger")
+        except (ValueError, ConnectionError, Exception) as e:
+            flash(f"Password reset failed: {e}", "danger")
 
     return render_template("forgot_password.html")
 
@@ -137,13 +150,20 @@ def dashboard():
     if "user_role" not in session:
         return redirect(url_for("login"))
 
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
-            notifications = cur.fetchall()
+    notifications = []
+    latest_sensor = {}
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Attempt to select from notifications table (assuming you created it)
+                cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 10")
+                notifications = cur.fetchall()
 
-            cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
-            latest_sensor = cur.fetchone()
+                cur.execute("SELECT * FROM sensordata ORDER BY DateTime DESC LIMIT 1")
+                latest_sensor = cur.fetchone()
+    except (ValueError, ConnectionError, Exception) as e:
+        print(f"Error fetching dashboard data: {e}")
+        # Application continues even if data fetching failed
 
     return render_template(
         "dashboard.html",
@@ -177,33 +197,48 @@ def get_image_list():
 
 @app.route("/get_data")
 def get_data():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan "
-                "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-    return jsonify(row or {"Temp": None, "Hum": None, "Light1": None, "Light2": None, "Amm": None, "ExhaustFan": None})
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT Temperature AS Temp, Humidity AS Hum, Light1, Light2, Ammonia AS Amm, ExhaustFan "
+                    "FROM sensordata ORDER BY DateTime DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+        return jsonify(row or {"Temp": None, "Hum": None, "Light1": None, "Light2": None, "Amm": None, "ExhaustFan": None})
+    except (ValueError, ConnectionError, Exception) as e:
+        print(f"Error in get_data: {e}")
+        return jsonify({"error": "Database connection or query failed", "detail": str(e)}), 500
+
 
 @app.route("/get_all_data")
 def get_all_data():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
-                "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
-            )
-            rows = cur.fetchall()
-    return jsonify(rows)
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DateTime, Temperature, Humidity, Light1, Light2, Ammonia, ExhaustFan "
+                    "FROM sensordata ORDER BY DateTime DESC LIMIT 10"
+                )
+                rows = cur.fetchall()
+        return jsonify(rows)
+    except (ValueError, ConnectionError, Exception) as e:
+        print(f"Error in get_all_data: {e}")
+        return jsonify({"error": "Database connection or query failed", "detail": str(e)}), 500
+
 
 @app.route("/get_all_notifications")
 def get_all_notifications():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 50")
-            rows = cur.fetchall()
-    return jsonify(rows)
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 50")
+                rows = cur.fetchall()
+        return jsonify(rows)
+    except (ValueError, ConnectionError, Exception) as e:
+        print(f"Error in get_all_notifications: {e}")
+        return jsonify({"error": "Database connection or query failed", "detail": str(e)}), 500
+
 
 @app.route("/insert_notifications", methods=["POST"])
 def insert_notifications():
@@ -211,19 +246,33 @@ def insert_notifications():
     items = payload.get("notifications") or payload.get("messages") or []
     if not items:
         return jsonify({"success": False, "message": "No notifications provided"}), 400
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            for msg in items:
-                cur.execute("INSERT INTO notifications (message) VALUES (%s)", (msg,))
-        conn.commit()
-    return jsonify({"success": True, "inserted": len(items)})
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for msg in items:
+                    cur.execute("INSERT INTO notifications (message) VALUES (%s)", (msg,))
+            conn.commit()
+        return jsonify({"success": True, "inserted": len(items)})
+    except (ValueError, ConnectionError, Exception) as e:
+        print(f"Error in insert_notifications: {e}")
+        # Return 500 Internal Server Error if the table is missing or connection fails
+        return jsonify({"success": False, "message": f"Insertion failed due to database error: {e}"}), 500
 
 # -------------------------
 # Health Check
 # -------------------------
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    # Test database connection for a proper health check
+    try:
+        with get_db_connection() as conn:
+            # Simple query to check if the connection is alive
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        return jsonify({"status": "ok", "database": "connected"})
+    except (ValueError, ConnectionError, Exception) as e:
+        return jsonify({"status": "error", "database": f"connection failed: {e}"}), 500
 
 # -------------------------
 # Main Entry
