@@ -45,7 +45,7 @@
           </a>
         </li>
         <li>
-          <a href="{{ url_for('feeding_schedule') }}" class="active">
+          <a href="{{ url_for('feed_schedule') }}" class="active">
             <span class="icon"><i class='bx bxs-bowl-rice'></i></span>
             <span class="title">Feeding Schedule</span>
           </a>
@@ -103,17 +103,19 @@
               </tr>
             </thead>
             <tbody>
-              {% for schedule in feeding_schedule %}
-              <tr>
-                <td>{{ schedule.time }}</td>
-                <td>{{ schedule.feed_type }}</td>
-                <td>{{ schedule.amount }}</td>
-              </tr>
+              {% if feeding_schedule %}
+                {% for schedule in feeding_schedule %}
+                <tr>
+                  <td>{{ schedule.time }}</td>
+                  <td>{{ schedule.feed_type }}</td>
+                  <td>{{ schedule.amount }}</td>
+                </tr>
+                {% endfor %}
               {% else %}
-              <tr>
-                <td colspan="3" style="text-align:center;">No feeding data available</td>
-              </tr>
-              {% endfor %}
+                <tr>
+                  <td colspan="3" style="text-align:center;">No feeding data available</td>
+                </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>
