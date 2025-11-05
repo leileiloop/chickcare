@@ -196,7 +196,7 @@ def logout():
     flash("Logged out successfully.", "info")
     return redirect(url_for("login"))
 
-# ----- Dashboard -----
+# ----- Dashboards -----
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -207,6 +207,7 @@ def dashboard():
 def admin_dashboard():
     return render_template("admin-dashboard.html")
 
+# ----- Profile & Settings -----
 @app.route("/profile")
 @login_required
 def profile():
@@ -304,9 +305,7 @@ def reset_with_token(token):
             flash("Could not reset password. Try again later.", "danger")
     return render_template("reset_password.html", token=token)
 
-# -------------------------
-# Dashboard features routes
-# -------------------------
+# ----- Feature Pages -----
 @app.route("/growth-monitoring")
 @login_required
 def growth_monitoring():
