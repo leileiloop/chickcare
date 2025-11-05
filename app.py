@@ -28,6 +28,7 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
+# Fix Postgres URL for psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
@@ -46,8 +47,9 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 # Session Security
 # -------------------------
+# For local testing, set SESSION_COOKIE_SECURE=False. Set True for production with HTTPS.
 app.config.update(
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=False,  
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax"
 )
@@ -56,6 +58,7 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
+    """Return a new PostgreSQL connection."""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
@@ -134,15 +137,16 @@ create_superadmin()
 # -------------------------
 @app.route("/")
 def home():
-    role = session.get("user_role")
-    if role in ["admin", "superadmin"]:
-        return redirect(url_for("admin_dashboard"))
-    elif role:
+    """Redirect users based on login state and role."""
+    if "user_id" in session:
+        role = session.get("user_role")
+        if role in ["admin", "superadmin"]:
+            return redirect(url_for("admin_dashboard"))
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# ----- Auth Routes -----
-@app.route("/login", methods=["GET", "POST"])
+# ----- Auth -----
+@app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email","").strip()
@@ -196,20 +200,16 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    """
-    MODIFIED: Fetches recent records to display on the dashboard.
-    """
-    records = []  # Default to an empty list
+    """User dashboard with recent records"""
+    records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Fetch the 5 most recent records
             cur.execute("SELECT * FROM data_table ORDER BY id DESC LIMIT 5")
             records = cur.fetchall()
     except Exception:
-        app.logger.exception("Failed to fetch recent records for dashboard")
+        app.logger.exception("Failed to fetch recent records")
         flash("Could not load recent data.", "warning")
-
-    return render_template("dashboard.html", records=records) # Pass 'records' to the template
+    return render_template("dashboard.html", records=records)
 
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
@@ -282,7 +282,7 @@ def generate():
                     "ChickCare Password Reset",
                     sender=MAIL_USERNAME,
                     recipients=[email],
-                    body=f"Hi {user['username']},\nClick the link below to reset your password:\n{reset_url}\nIf you didn't request this, ignore this email."
+                    body=f"Hi {user['username']},\nClick the link to reset your password:\n{reset_url}\nIf you didn't request this, ignore this email."
                 )
                 mail.send(msg)
                 flash("Password reset link sent! Check your email.", "info")
@@ -352,7 +352,7 @@ def report():
 @app.route("/data-table")
 @login_required
 def data_table():
-    """Added missing route to prevent 500 errors."""
+    """Fetch and show all records"""
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
