@@ -6,3 +6,4 @@ psycopg[binary]==3.2.12
 Flask-SocketIO==5.3.3
 eventlet==0.33.3
 Flask-Mail==0.9.1
+psycopg_pool 
