@@ -5,153 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Feeding Schedule | ChickCare</title>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Boxicons -->
-  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-
-  <!-- Main Styles -->
+  <!-- ======= Styles ====== -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <style>
-    .main {
-      padding: 2rem;
-      background: #f9f9f9;
-      border-radius: 15px;
-      margin-top: 1rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    h1 {
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 1rem;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
-    }
-
-    th, td {
-      text-align: left;
-      padding: 12px 16px;
-    }
-
-    th {
-      background-color: #3c91e6;
-      color: #fff;
-      font-weight: 500;
-    }
-
-    tr:nth-child(even) {
-      background-color: #f3f6fa;
-    }
-
-    tr:hover {
-      background-color: #eaf2ff;
-    }
-
-    .add-btn {
-      display: inline-block;
-      background: #3c91e6;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: background 0.3s ease;
-      margin-bottom: 1.5rem;
-    }
-
-    .add-btn:hover {
-      background: #337bd3;
-    }
-
-    form {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      margin-top: 2rem;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-
-    form input, form select {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 15px;
-    }
-
-    form button {
-      background-color: #3c91e6;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    form button:hover {
-      background-color: #337bd3;
-    }
-  </style>
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 
 <body>
-  <!-- =============== Navigation ================ -->
   <div class="container">
+    <!-- =============== Navigation ================ -->
     <div class="navigation">
       <ul>
-        <li><a href="{{ url_for('dashboard') }}"><span class="icon"><i class='bx bx-home'></i></span><span class="title">Dashboard</span></a></li>
-        <li><a href="{{ url_for('growth') }}"><span class="icon"><i class='bx bx-line-chart'></i></span><span class="title">Growth</span></a></li>
-        <li><a href="{{ url_for('feed') }}" class="active"><span class="icon"><i class='bx bx-bowl-hot'></i></span><span class="title">Feeding</span></a></li>
-        <li><a href="{{ url_for('logout') }}"><span class="icon"><i class='bx bx-log-out'></i></span><span class="title">Logout</span></a></li>
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="title">ChickCare</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-dashboard'></i></span>
+            <span class="title">Dashboard</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('growth_monitoring') }}">
+            <span class="icon"><i class='bx bxs-doughnut-chart'></i></span>
+            <span class="title">Growth Monitoring</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('data_table') }}">
+            <span class="icon"><i class='bx bx-table'></i></span>
+            <span class="title">Data Table</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('feeding_schedule') }}" class="active">
+            <span class="icon"><i class='bx bxs-bowl-rice'></i></span>
+            <span class="title">Feeding Schedule</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('environment') }}">
+            <span class="icon"><i class='bx bxs-thermometer'></i></span>
+            <span class="title">Environment</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('sanitization') }}">
+            <span class="icon"><i class='bx bxs-virus'></i></span>
+            <span class="title">Sanitization</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('logout') }}">
+            <span class="icon"><i class='bx bx-log-out'></i></span>
+            <span class="title">Logout</span>
+          </a>
+        </li>
       </ul>
     </div>
 
     <!-- ========================= Main ==================== -->
     <div class="main">
-      <h1>Feeding Schedule</h1>
-      <a href="#add-feed" class="add-btn"><i class='bx bx-plus'></i> Add Feeding Record</a>
+      <div class="topbar">
+        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="search">
+          <label>
+            <input type="text" placeholder="Search here">
+            <i class='bx bx-search'></i>
+          </label>
+        </div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='img/user.jpg') }}" alt="User">
+        </div>
+      </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Feed Type</th>
-            <th>Amount (g)</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for feed in feed_data %}
-          <tr>
-            <td>{{ feed.date }}</td>
-            <td>{{ feed.feed_type }}</td>
-            <td>{{ feed.amount }}</td>
-            <td>{{ feed.time }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" style="text-align:center; color:#666;">No feeding records found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <!-- ======================= Feeding Schedule ================== -->
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>Feeding Schedule</h2>
+          </div>
 
-      <form id="add-feed" action="{{ url_for('add_feed') }}" method="POST">
-        <h2>Add Feeding Record</h2>
-        <input type="date" name="date" required>
-        <input type="text" name="feed_type" placeholder="Feed Type" required>
-        <input type="number" name="amount" placeholder="Amount (g)" required>
-        <input type="time" name="time" required>
-        <button type="submit">Save Record</button>
-      </form>
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Feed Type</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for schedule in feeding_schedule %}
+              <tr>
+                <td>{{ schedule.time }}</td>
+                <td>{{ schedule.feed_type }}</td>
+                <td>{{ schedule.amount }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" style="text-align: center;">No feeding data available</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
