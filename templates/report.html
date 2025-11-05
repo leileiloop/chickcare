@@ -3,91 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports | ChickCare</title>
-
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Boxicons -->
-  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-
-  <!-- Main Stylesheet -->
+  <title>Reports | ChickCare Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 
 <body>
   <div class="container">
-    <!-- ======= Navigation ======= -->
+    <!-- =============== Navigation ================ -->
     <div class="navigation">
       <ul>
         <li>
           <a href="{{ url_for('dashboard') }}">
-            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="icon">
+              <i class='bx bxs-chicken'></i>
+            </span>
             <span class="title">ChickCare</span>
           </a>
         </li>
 
-        <li><a href="{{ url_for('dashboard') }}"><span class="icon"><i class='bx bxs-dashboard'></i></span><span class="title">Dashboard</span></a></li>
-        <li><a href="{{ url_for('environment') }}"><span class="icon"><i class='bx bx-cloud'></i></span><span class="title">Environment</span></a></li>
-        <li><a href="{{ url_for('growth') }}"><span class="icon"><i class='bx bx-line-chart'></i></span><span class="title">Growth</span></a></li>
-        <li><a href="{{ url_for('feed') }}"><span class="icon"><i class='bx bx-bowl-rice'></i></span><span class="title">Feeding</span></a></li>
-        <li><a href="{{ url_for('sanitization') }}"><span class="icon"><i class='bx bx-wash'></i></span><span class="title">Sanitization</span></a></li>
-        <li class="active"><a href="{{ url_for('report') }}"><span class="icon"><i class='bx bx-file'></i></span><span class="title">Reports</span></a></li>
-        <li><a href="{{ url_for('logout') }}"><span class="icon"><i class='bx bx-log-out'></i></span><span class="title">Logout</span></a></li>
+        <li><a href="{{ url_for('dashboard') }}"><i class='bx bx-grid-alt'></i><span class="title">Dashboard</span></a></li>
+        <li><a href="{{ url_for('growth') }}"><i class='bx bx-line-chart'></i><span class="title">Growth</span></a></li>
+        <li><a href="{{ url_for('environment') }}"><i class='bx bx-leaf'></i><span class="title">Environment</span></a></li>
+        <li><a href="{{ url_for('feed') }}"><i class='bx bx-bowl-hot'></i><span class="title">Feeding</span></a></li>
+        <li><a href="{{ url_for('sanitization') }}"><i class='bx bx-droplet'></i><span class="title">Sanitization</span></a></li>
+        <li class="active"><a href="{{ url_for('report') }}"><i class='bx bx-file'></i><span class="title">Report</span></a></li>
+        <li><a href="{{ url_for('logout') }}"><i class='bx bx-log-out'></i><span class="title">Logout</span></a></li>
       </ul>
     </div>
 
-    <!-- ======= Main Section ======= -->
+    <!-- ========================= Main ==================== -->
     <div class="main">
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
-        <div class="title">Reports Overview</div>
+        <div class="search">
+          <label>
+            <input type="text" placeholder="Search here">
+            <i class='bx bx-search'></i>
+          </label>
+        </div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='img/user.jpg') }}" alt="User">
+        </div>
       </div>
 
-      <!-- ======= Report Content ======= -->
+      <!-- ======================= Report ================== -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
             <h2>System Reports</h2>
+            <a href="#" class="btn">Generate Report</a>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Temperature (°C)</th>
-                <th>Humidity (%)</th>
-                <th>Feed Used (kg)</th>
-                <th>Mortality</th>
-                <th>Notes</th>
+                <td>Report ID</td>
+                <td>Date</td>
+                <td>Type</td>
+                <td>Status</td>
+                <td>Action</td>
               </tr>
             </thead>
+
             <tbody>
               <tr>
-                <td>2025-11-01</td>
-                <td>32.4</td>
-                <td>65</td>
-                <td>4.8</td>
-                <td>0</td>
-                <td>Normal</td>
+                <td>#RPT-001</td>
+                <td>2025-11-05</td>
+                <td>Growth Data</td>
+                <td><span class="status delivered">Completed</span></td>
+                <td><a href="#">View</a></td>
               </tr>
               <tr>
+                <td>#RPT-002</td>
+                <td>2025-11-04</td>
+                <td>Environment</td>
+                <td><span class="status pending">Processing</span></td>
+                <td><a href="#">View</a></td>
+              </tr>
+              <tr>
+                <td>#RPT-003</td>
                 <td>2025-11-02</td>
-                <td>31.9</td>
-                <td>64</td>
-                <td>5.0</td>
-                <td>1</td>
-                <td>Stable</td>
+                <td>Feeding</td>
+                <td><span class="status return">Failed</span></td>
+                <td><a href="#">View</a></td>
               </tr>
-              <tr>
-                <td>2025-11-03</td>
-                <td>32.1</td>
-                <td>63</td>
-                <td>4.9</td>
-                <td>0</td>
-                <td>Normal</td>
-              </tr>
-              <!-- You can dynamically render rows from Flask later -->
             </tbody>
           </table>
         </div>
@@ -95,17 +95,6 @@
     </div>
   </div>
 
-  <!-- ======= Script ======= -->
-  <script>
-    // Toggle navigation menu
-    const toggle = document.querySelector('.toggle');
-    const navigation = document.querySelector('.navigation');
-    const main = document.querySelector('.main');
-
-    toggle.onclick = function() {
-      navigation.classList.toggle('active');
-      main.classList.toggle('active');
-    };
-  </script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
