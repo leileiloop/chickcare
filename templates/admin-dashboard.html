@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="container">
-    <!-- ================= Navigation ================= -->
+    <!-- ================== Navigation ================= -->
     <div class="navigation">
       <ul>
         <li>
@@ -58,6 +58,9 @@
       <div class="topbar">
         <div class="toggle"><i class="bx bx-menu"></i></div>
         <div class="title">Admin Control Panel</div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar" />
+        </div>
       </div>
 
       <!-- Dashboard Cards -->
@@ -111,13 +114,19 @@
               </tr>
             </thead>
             <tbody>
-              {% for activity in recent_activities %}
-              <tr>
-                <td>{{ activity.user }}</td>
-                <td>{{ activity.action }}</td>
-                <td>{{ activity.date }}</td>
-              </tr>
-              {% endfor %}
+              {% if recent_activities %}
+                {% for activity in recent_activities %}
+                <tr>
+                  <td>{{ activity.user }}</td>
+                  <td>{{ activity.action }}</td>
+                  <td>{{ activity.date }}</td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="3" style="text-align:center;">No recent activity found.</td>
+                </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>
@@ -125,7 +134,7 @@
     </div>
   </div>
 
-  <!-- ======= Scripts ======= -->
+  <!-- JS -->
   <script>
     // Sidebar toggle
     const toggle = document.querySelector('.toggle');
