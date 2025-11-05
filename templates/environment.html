@@ -45,7 +45,7 @@
           </a>
         </li>
         <li>
-          <a href="{{ url_for('feeding_schedule') }}">
+          <a href="{{ url_for('feed_schedule') }}">
             <span class="icon"><i class='bx bxs-bowl-rice'></i></span>
             <span class="title">Feeding Schedule</span>
           </a>
@@ -104,18 +104,20 @@
               </tr>
             </thead>
             <tbody>
-              {% for record in environment_data %}
-              <tr>
-                <td>{{ record.temperature }}</td>
-                <td>{{ record.humidity }}</td>
-                <td>{{ record.date }}</td>
-                <td>{{ record.time }}</td>
-              </tr>
+              {% if environment_data %}
+                {% for record in environment_data %}
+                <tr>
+                  <td>{{ record.temperature }}</td>
+                  <td>{{ record.humidity }}</td>
+                  <td>{{ record.date }}</td>
+                  <td>{{ record.time }}</td>
+                </tr>
+                {% endfor %}
               {% else %}
-              <tr>
-                <td colspan="4" style="text-align:center;">No environment data available</td>
-              </tr>
-              {% endfor %}
+                <tr>
+                  <td colspan="4" style="text-align:center;">No environment data available</td>
+                </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>
