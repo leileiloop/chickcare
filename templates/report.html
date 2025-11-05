@@ -1,379 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Chick Care Record</title>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Minimal styles added for the Report page structure, assuming main styles handle table layout */
-        .attendance-container h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: var(--blue); /* Assuming a CSS variable is defined */
-        }
-        .filter-controls, .period-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
-            align-items: center;
-        }
-        .filter-controls select, .filter-controls input, .filter-controls button, .period-buttons button {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            cursor: pointer;
-        }
-        .period-buttons .period-btn.active {
-            background-color: var(--blue);
-            color: #fff;
-        }
-        .attendance-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .attendance-table thead th {
-            background-color: var(--blue);
-            color: #fff;
-            padding: 10px;
-            text-align: left;
-        }
-        /* Added CSS to ensure all tables are correctly identified for JS */
-        .all-tables {
-            display: none; /* Hidden by default, JS will show the first one */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports | ChickCare</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
+  <div class="container">
+    <!-- ======= Navigation ======= -->
+    <div class="navigation">
+      <ul>
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="title">ChickCare</span>
+          </a>
+        </li>
 
-        <div class="container">
-        <div class="navigation">
-            <ul>
-                <li>
-                    <a href="#">
-                        <span class="icon">
-                            <img src="static/imgs/CC.png" alt="Logo">
-                        </span>
-                        <span class="title1">Chick Care</span>
-                    </a>
-                </li>
+        <li><a href="{{ url_for('dashboard') }}"><span class="icon"><i class='bx bxs-dashboard'></i></span><span class="title">Dashboard</span></a></li>
+        <li><a href="{{ url_for('environment') }}"><span class="icon"><i class='bx bx-cloud'></i></span><span class="title">Environment</span></a></li>
+        <li><a href="{{ url_for('growth') }}"><span class="icon"><i class='bx bx-line-chart'></i></span><span class="title">Growth</span></a></li>
+        <li><a href="{{ url_for('feed') }}"><span class="icon"><i class='bx bx-bowl-rice'></i></span><span class="title">Feeding</span></a></li>
+        <li><a href="{{ url_for('sanitization') }}"><span class="icon"><i class='bx bx-wash'></i></span><span class="title">Sanitization</span></a></li>
+        <li class="active"><a href="{{ url_for('report') }}"><span class="icon"><i class='bx bx-file'></i></span><span class="title">Reports</span></a></li>
+        <li><a href="{{ url_for('logout') }}"><span class="icon"><i class='bx bx-log-out'></i></span><span class="title">Logout</span></a></li>
+      </ul>
+    </div>
 
-                <li>
-                    <a href="/main_dashboard">
-                        <span class="icon">
-                            <ion-icon name="reorder-four-outline"></ion-icon>
-                        </span>
-                        <span class="title">Dashboard</span>
-                    </a>
-                </li>
+    <!-- ======= Main Section ======= -->
+    <div class="main">
+      <div class="topbar">
+        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="title">Reports Overview</div>
+      </div>
 
-                <li>
-                    <a href="/webcam">
-                        <span class="icon">
-                            <ion-icon name="stats-chart-outline"></ion-icon>
-                        </span>
-                        <span class="title">Growth Tracking</span>
-                    </a>
-                </li>
+      <!-- ======= Report Content ======= -->
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>System Reports</h2>
+          </div>
 
-                <li>
-                    <a href="/feeding">
-                        <span class="icon">
-                            <ion-icon name="layers-outline"></ion-icon>
-                        </span>
-                        <span class="title">Supplies Stock</span>
-                    </a>
-                </li>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Temperature (°C)</th>
+                <th>Humidity (%)</th>
+                <th>Feed Used (kg)</th>
+                <th>Mortality</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2025-11-01</td>
+                <td>32.4</td>
+                <td>65</td>
+                <td>4.8</td>
+                <td>0</td>
+                <td>Normal</td>
+              </tr>
+              <tr>
+                <td>2025-11-02</td>
+                <td>31.9</td>
+                <td>64</td>
+                <td>5.0</td>
+                <td>1</td>
+                <td>Stable</td>
+              </tr>
+              <tr>
+                <td>2025-11-03</td>
+                <td>32.1</td>
+                <td>63</td>
+                <td>4.9</td>
+                <td>0</td>
+                <td>Normal</td>
+              </tr>
+              <!-- You can dynamically render rows from Flask later -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                <li>
-                    <a href="/environment">
-                        <span class="icon">
-                            <ion-icon name="cloudy-outline"></ion-icon>
-                        </span>
-                        <span class="title">Environment</span>
-                    </a>
-                </li>
+  <!-- ======= Script ======= -->
+  <script>
+    // Toggle navigation menu
+    const toggle = document.querySelector('.toggle');
+    const navigation = document.querySelector('.navigation');
+    const main = document.querySelector('.main');
 
-                <li>
-                    <a href="/dashboard">
-                        <span class="icon">
-                            <ion-icon name="notifications-circle-outline"></ion-icon>
-                        </span>
-                        <span class="title">Notifications</span>
-                    </a>
-                </li>
-
-                <li>
-                    <a href="/sanitization">
-                        <span class="icon">
-                            <ion-icon name="water-outline"></ion-icon>
-                        </span>
-                        <span class="title">Sanitization</span>
-                    </a>
-                </li>
-
-                {% if session['user_role'] == 'admin' %}
-                <li>
-                    <a href="/manage_users">
-                        <span class="icon">
-                            <ion-icon name="people-outline"></ion-icon>
-                        </span>
-                        <span class="title">Manage Users</span>
-                    </a>
-                </li>
-                {% endif %}
-
-                <li class="active">                     <a href="/report">
-                        <span class="icon">
-                            <ion-icon name="file-tray-stacked-outline"></ion-icon>
-                        </span>
-                        <span class="title">Report</span>
-                    </a>
-                </li>
-
-                <li>
-                                        <a href="/logout">
-                        <span class="icon">
-                            <ion-icon name="log-out-outline"></ion-icon>
-                        </span>
-                        <span class="title">Sign Out</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-                <div class="main">
-            <div class="topbar">
-                <div class="toggle">
-                    <ion-icon name="menu-outline"></ion-icon>
-                </div>
-
-                <div class="datetime">
-                    <span id="displayDateTime"></span>
-                </div>
-
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="static/imgs/bell.png" alt="Notifications"> <span id="notificationCount">0</span>
-                </div>
-                <div class="notifi-box" id="box">
-                    <h2>Notifications <span id="notificationCount1">0</span></h2>
-                    <div class="notifi-item">
-                        <div class="text" id="notificationItems"></div>
-                    </div>
-                </div>
-
-                <div class="user">
-                    <img src="static/imgs/admin.jpg" alt="User Profile">
-                </div>
-            </div>
-
-                        <div class="attendance-container">
-                <h1>CHICK CARE RECORD</h1>
-
-                                <div class="filter-controls">
-                    <select id="recordType">
-                        <option value="growth">Growth Tracking (ChickStatus)</option>
-                        <option value="growth1">Growth Tracking (Weight)</option>
-                        <option value="environment">Environment</option>
-                        <option value="supplies">Supplies Stocks</option>
-                        <option value="notifications">Notifications</option>
-                        <option value="sanitization">Sanitization</option>
-                    </select>
-
-                    <input type="text" id="searchField" placeholder="Search">
-                    <button id="searchBtn">Enter</button>
-
-                    <label for="dateFrom">From:</label>
-                    <input type="date" id="dateFrom" value="2025-07-04">
-                    <label for="dateTo">To:</label>
-                    <input type="date" id="dateTo" value="2025-08-18">
-
-                    <button id="filterBtn" title="Apply Filters">
-                        <ion-icon name="funnel-outline"></ion-icon>
-                    </button>
-                </div>
-
-                                <div class="period-buttons">
-                    <button id="btnDaily" class="period-btn">Daily</button>
-                    <button id="btnWeekly" class="period-btn">Weekly</button>
-                    <button id="btnMonthly" class="period-btn">Monthly</button>
-                </div>
-
-                                <div class="attendance-table all-tables" id="tableGrowth" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>ChickNumber</th>
-                                <th>Status (Healthy/Sick)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-
-                <div class="attendance-table all-tables" id="tableGrowth1" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>ChickNumber</th>
-                                <th>Weight</th>
-                                <th>WeighingCount</th>
-                                <th>AverageWeight</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-
-                <div class="attendance-table all-tables" id="tableEnvironment" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Humidity</th>
-                                <th>Temperature</th>
-                                <th>Light1</th>
-                                <th>Light2</th>
-                                <th>Ammonia</th>
-                                <th>ExhaustFan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-
-                <div class="attendance-table all-tables" id="tableSupplies" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Food (Level)</th>
-                                <th>Water (Level)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-
-                <div class="attendance-table all-tables" id="tableNotifications" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-
-                <div class="attendance-table all-tables" id="tableSanitization" style="display:none">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Conveyor (Status)</th>
-                                <th>Sprinkle (Status)</th>
-                                <th>UVLight (Status)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                                    </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-        <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const recordTypeSelect = document.getElementById('recordType');
-            const allTables = document.querySelectorAll('.all-tables');
-            const periodButtons = document.querySelectorAll('.period-btn');
-            const filterBtn = document.getElementById('filterBtn');
-            const searchBtn = document.getElementById('searchBtn');
-
-            /**
-             * Shows the table corresponding to the selected value in the dropdown.
-             */
-            function showSelectedTable() {
-                const selectedValue = recordTypeSelect.value;
-                
-                allTables.forEach(table => {
-                    table.style.display = 'none';
-                });
-
-                const targetTable = document.getElementById('table' + selectedValue.charAt(0).toUpperCase() + selectedValue.slice(1));
-                
-                if (targetTable) {
-                    targetTable.style.display = 'block';
-                }
-            }
-
-            // Event Listener for dropdown change
-            recordTypeSelect.addEventListener('change', showSelectedTable);
-
-            // Initialize by showing the first table
-            showSelectedTable();
-
-            // Period Buttons Logic (Visual feedback and potential AJAX trigger)
-            periodButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    periodButtons.forEach(btn => btn.classList.remove('active'));
-                    this.classList.add('active');
-
-                    // TODO: Implement AJAX call here to fetch data for the selected period
-                    console.log('Period selected:', this.textContent.trim());
-                    // fetchData(recordTypeSelect.value, { period: this.textContent.trim() });
-                });
-            });
-
-            // Filter and Search Buttons Logic (Visual feedback and potential AJAX trigger)
-            filterBtn.addEventListener('click', function() {
-                const dateFrom = document.getElementById('dateFrom').value;
-                const dateTo = document.getElementById('dateTo').value;
-
-                // TODO: Implement AJAX call here to fetch data filtered by date
-                console.log('Filtering by date:', dateFrom, 'to', dateTo);
-                // fetchData(recordTypeSelect.value, { dateFrom, dateTo });
-            });
-
-            searchBtn.addEventListener('click', function() {
-                const searchField = document.getElementById('searchField').value;
-                
-                // TODO: Implement AJAX call here to fetch data filtered by search term
-                console.log('Searching for:', searchField);
-                // fetchData(recordTypeSelect.value, { search: searchField });
-            });
-
-            // Optional: Set default 'Daily' button as active for better UX
-            document.getElementById('btnDaily').classList.add('active');
-        });
-
-        // The following functions (toggle, toggleNotifi, updateDateTime) are expected to be in main.js
-        // But if they're not, you'll need to define them here or in main.js
-        // Example placeholder for context:
-        /*
-        function toggle() {
-            const navigation = document.querySelector('.navigation');
-            const main = document.querySelector('.main');
-            navigation.classList.toggle('active');
-            main.classList.toggle('active');
-        }
-        */
-    </script>
+    toggle.onclick = function() {
+      navigation.classList.toggle('active');
+      main.classList.toggle('active');
+    };
+  </script>
 </body>
 </html>
