@@ -10,13 +10,13 @@ from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
 
 # -------------------------
-# Flask app setup
+# Flask App Setup
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO)
 
 # -------------------------
-# Environment variables
+# Environment Variables
 # -------------------------
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
 missing = [v for v in required_env if v not in os.environ]
@@ -28,11 +28,10 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# Fix Postgres URL for psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
-# Flask-Mail setup
+# Flask-Mail Setup
 # -------------------------
 app.config.update(
     MAIL_SERVER="smtp.gmail.com",
@@ -45,7 +44,7 @@ mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------------
-# Session security
+# Session Security
 # -------------------------
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -54,10 +53,9 @@ app.config.update(
 )
 
 # -------------------------
-# Database helpers
+# Database Helper
 # -------------------------
 def get_conn():
-    """Returns a new database connection."""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
@@ -85,7 +83,7 @@ def role_required(*roles):
     return decorator
 
 # -------------------------
-# User helpers
+# User Helpers
 # -------------------------
 def get_user_by_email(email):
     try:
@@ -110,7 +108,7 @@ def get_current_user():
     return get_user_by_id(user_id) if user_id else None
 
 def create_superadmin():
-    """Create default superadmin with username 'admin' and password 'admin'."""
+    """Create default superadmin if none exists"""
     super_email = "superadmin@example.com"
     super_username = "admin"
     super_pass = generate_password_hash("admin")
@@ -143,12 +141,12 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# ----- Login -----
+# ----- Auth Routes -----
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
+        email = request.form.get("email","").strip()
+        password = request.form.get("password","")
         user = get_user_by_email(email)
         if user and check_password_hash(user["password"], password):
             session.update({
@@ -162,23 +160,21 @@ def login():
         flash("Invalid email or password", "danger")
     return render_template("login.html")
 
-# ----- Register -----
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
         username = request.form.get("username","").strip()
         email = request.form.get("email","").strip()
-        raw_pass = request.form.get("password","")
-        if not username or not email or not raw_pass:
+        password = request.form.get("password","")
+        if not username or not email or not password:
             flash("All fields are required.", "warning")
             return redirect(url_for("register"))
-
-        hashed_pass = generate_password_hash(raw_pass)
+        hashed = generate_password_hash(password)
         try:
             with get_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
-                    (username,email,hashed_pass,"user")
+                    (username,email,hashed,"user")
                 )
                 conn.commit()
             flash("Registration successful! Please log in.", "success")
@@ -190,7 +186,6 @@ def register():
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
 
-# ----- Logout -----
 @app.route("/logout")
 def logout():
     session.clear()
@@ -226,7 +221,6 @@ def settings():
         if not username or not email:
             flash("Username and email cannot be empty.", "warning")
             return redirect(url_for("settings"))
-
         try:
             with get_conn() as conn, conn.cursor() as cur:
                 if new_pass:
@@ -275,7 +269,7 @@ def generate():
                     "ChickCare Password Reset",
                     sender=MAIL_USERNAME,
                     recipients=[email],
-                    body=f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
+                    body=f"Hi {user['username']},\nClick the link below to reset your password:\n{reset_url}\nIf you didn't request this, ignore this email."
                 )
                 mail.send(msg)
                 flash("Password reset link sent! Check your email.", "info")
@@ -298,15 +292,15 @@ def reset_with_token(token):
         return redirect(url_for("generate"))
 
     if request.method == "POST":
-        new_pass = request.form.get("password","")
-        if not new_pass:
+        password = request.form.get("password","")
+        if not password:
             flash("Password cannot be empty.", "warning")
             return redirect(url_for("reset_with_token", token=token))
         try:
             with get_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "UPDATE users SET password=%s WHERE email=%s",
-                    (generate_password_hash(new_pass), email)
+                    (generate_password_hash(password), email)
                 )
                 conn.commit()
             flash("Password reset successful! You can now log in.", "success")
@@ -342,8 +336,21 @@ def sanitization():
 def report():
     return render_template("report.html")
 
+@app.route("/data-table")
+@login_required
+def data_table():
+    """Added missing route to prevent 500 errors."""
+    data = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM data_table ORDER BY id DESC")
+            data = cur.fetchall()
+    except Exception:
+        app.logger.exception("Failed to fetch data table")
+    return render_template("data_table.html", data=data)
+
 # -------------------------
-# Run app
+# Run App
 # -------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
