@@ -181,8 +181,10 @@ def register():
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for("login"))
         except pg_errors.UniqueViolation:
+            conn.rollback()
             flash("Email already registered.", "danger")
         except Exception:
+            conn.rollback()
             app.logger.exception("Registration failed")
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
@@ -236,6 +238,7 @@ def settings():
             flash("Settings updated successfully.", "success")
             return redirect(url_for("settings"))
         except Exception:
+            conn.rollback()
             app.logger.exception("Failed to update settings")
             flash("Update failed. Try again later.", "danger")
     return render_template("settings.html", user=user)
@@ -253,44 +256,52 @@ def manage_users():
     return render_template("manage-users.html", users=users)
 
 # ----- Password Reset -----
-@app.route("/reset-password", methods=["GET","POST"])
-def reset_request():
+@app.route("/generate", methods=["GET","POST"])
+def generate():
     if request.method == "POST":
         email = request.form.get("email","").strip()
         user = get_user_by_email(email)
         if user:
             token = serializer.dumps(email, salt="password-reset-salt")
             reset_url = url_for("reset_with_token", token=token, _external=True)
-            msg = Message("Password Reset Request", sender=MAIL_USERNAME, recipients=[email])
-            msg.body = f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
+            msg = Message(
+                "ChickCare Password Reset",
+                sender=MAIL_USERNAME,
+                recipients=[email],
+                body=f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
+            )
             mail.send(msg)
             flash("Password reset link sent! Check your email.", "info")
         else:
             flash("Email not found.", "warning")
-    return render_template("reset_password.html", token="")
+    return render_template("generate.html")
 
-@app.route("/reset-password/<token>", methods=["GET","POST"])
+@app.route("/reset/<token>", methods=["GET","POST"])
 def reset_with_token(token):
     try:
         email = serializer.loads(token, salt="password-reset-salt", max_age=3600)
     except SignatureExpired:
-        flash("The password reset link has expired.", "danger")
-        return redirect(url_for("reset_request"))
+        flash("The link has expired.", "danger")
+        return redirect(url_for("generate"))
     except BadSignature:
-        flash("Invalid reset token.", "danger")
-        return redirect(url_for("reset_request"))
+        flash("Invalid or tampered token.", "danger")
+        return redirect(url_for("generate"))
 
     if request.method == "POST":
         new_pass = request.form.get("password","")
         try:
             with use_conn() as conn, conn.cursor() as cur:
-                cur.execute("UPDATE users SET password=%s WHERE email=%s", (generate_password_hash(new_pass), email))
+                cur.execute(
+                    "UPDATE users SET password=%s WHERE email=%s",
+                    (generate_password_hash(new_pass), email)
+                )
                 conn.commit()
-            flash("Password reset successfully! Please log in.", "success")
+            flash("Password reset successful! You can now log in.", "success")
             return redirect(url_for("login"))
         except Exception:
+            conn.rollback()
             app.logger.exception("Password reset failed")
-            flash("Error updating password.", "danger")
+            flash("Could not reset password. Try again later.", "danger")
     return render_template("reset_password.html", token=token)
 
 # -------------------------
