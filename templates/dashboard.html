@@ -1,160 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Notifications | Chick Care</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Notifications table styling */
-        .NotifTable {
-            margin: 20px 0;
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .NotifTable table, .NotifTable th, .NotifTable td {
-            border: 1px solid #ccc;
-        }
-        .NotifTable th, .NotifTable td {
-            padding: 8px 12px;
-            text-align: left;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard | ChickCare</title>
 
-        /* Notification box */
-        .notifi-box {
-            display: none;
-            position: absolute;
-            top: 60px;
-            right: 20px;
-            width: 300px;
-            background: #fff;
-            border: 1px solid #ccc;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 100;
-        }
-        .notifi-box h2 {
-            padding: 10px;
-            border-bottom: 1px solid #ccc;
-            font-size: 1.1em;
-        }
-        .notifi-item {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .notifi-item .text {
-            padding: 10px;
-        }
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
 
-        /* Topbar icons */
-        .iconn {
-            position: relative;
-            cursor: pointer;
-        }
-        #notificationCount {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: red;
-            color: white;
-            font-size: 0.7em;
-            padding: 2px 5px;
-            border-radius: 50%;
-        }
-    </style>
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
-    <div class="container">
-        <!-- Navigation -->
-        <div class="navigation">
-            <ul>
-                <li>
-                    <a href="{{ url_for('dashboard') }}">
-                        <span class="icon"><img src="{{ url_for('static', filename='imgs/CC.png') }}"></span>
-                        <span class="title1">Chick Care</span>
-                    </a>
-                </li>
-                <li><a href="{{ url_for('main_dashboard') }}"><span class="icon"><ion-icon name="reorder-four-outline"></ion-icon></span>Dashboard</a></li>
-                <li><a href="{{ url_for('webcam') }}"><span class="icon"><ion-icon name="stats-chart-outline"></ion-icon></span>Growth Tracking</a></li>
-                <li><a href="{{ url_for('feeding') }}"><span class="icon"><ion-icon name="layers-outline"></ion-icon></span>Supplies Stock</a></li>
-                <li><a href="{{ url_for('environment') }}"><span class="icon"><ion-icon name="cloudy-outline"></ion-icon></span>Environment</a></li>
-                <li><a href="{{ url_for('dashboard') }}"><span class="icon"><ion-icon name="notifications-circle-outline"></ion-icon></span>Notifications</a></li>
-                <li><a href="{{ url_for('sanitization') }}"><span class="icon"><ion-icon name="water-outline"></ion-icon></span>Sanitization</a></li>
-                {% if session.get('user_role') == 'admin' %}
-                <li><a href="{{ url_for('manage_users') }}"><span class="icon"><ion-icon name="people-outline"></ion-icon></span>Manage Users</a></li>
-                {% endif %}
-                <li><a href="{{ url_for('report') }}"><span class="icon"><ion-icon name="file-tray-stacked-outline"></ion-icon></span>Report</a></li>
-                <li><a href="{{ url_for('logout') }}"><span class="icon"><ion-icon name="log-out-outline"></ion-icon></span>Sign Out</a></li>
-            </ul>
-        </div>
 
-        <!-- Main content -->
-        <div class="main">
-            <!-- Topbar -->
-            <div class="topbar">
-                <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
-                <div class="datetime"><span id="displayDateTime"></span></div>
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="Notifications">
-                    <span id="notificationCount">{{ notifications|length }}</span>
-                </div>
+  <div class="container">
+    <!-- =============== Navigation ================ -->
+    <div class="navigation">
+      <ul>
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class="bx bxs-chicken"></i></span>
+            <span class="title">ChickCare</span>
+          </a>
+        </li>
 
-                <div class="notifi-box" id="box">
-                    <h2>Notifications <span id="notificationCount1">{{ notifications|length }}</span></h2>
-                    <div class="notifi-item">
-                        <div class="text" id="notificationItems">
-                            {% for notif in notifications %}
-                                <p>{{ notif.DateTime }} - {{ notif.message }}</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
+        <li>
+          <a href="{{ url_for('dashboard') }}" class="active">
+            <span class="icon"><i class="bx bxs-dashboard"></i></span>
+            <span class="title">Dashboard</span>
+          </a>
+        </li>
 
-                <div class="user">
-                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="Admin">
-                </div>
-            </div>
+        <li>
+          <a href="{{ url_for('growth_monitoring') }}">
+            <span class="icon"><i class="bx bxs-bar-chart-square"></i></span>
+            <span class="title">Growth</span>
+          </a>
+        </li>
 
-            <!-- Notifications Table -->
-            <div class="Notifications">
-                <h1>Notifications</h1>
-                <div id="table-body4" class="NotifTable">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>DateTime</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for notif in notifications %}
-                            <tr>
-                                <td>{{ notif.DateTime }}</td>
-                                <td>{{ notif.message }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        <li>
+          <a href="{{ url_for('data_table') }}">
+            <span class="icon"><i class="bx bxs-data"></i></span>
+            <span class="title">Data Table</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('feeding_schedule') }}">
+            <span class="icon"><i class="bx bxs-time-five"></i></span>
+            <span class="title">Feeding Schedule</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('environment') }}">
+            <span class="icon"><i class="bx bxs-thermometer"></i></span>
+            <span class="title">Environment</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('sanitization') }}">
+            <span class="icon"><i class="bx bxs-virus"></i></span>
+            <span class="title">Sanitization</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('logout') }}">
+            <span class="icon"><i class="bx bx-log-out"></i></span>
+            <span class="title">Logout</span>
+          </a>
+        </li>
+      </ul>
     </div>
 
-    <!-- Scripts -->
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-    <script>
-        // Toggle notification box
-        function toggleNotifi() {
-            const box = document.getElementById('box');
-            box.style.display = box.style.display === 'block' ? 'none' : 'block';
-        }
+    <!-- ========================= Main ==================== -->
+    <div class="main">
+      <div class="topbar">
+        <div class="toggle"><i class="bx bx-menu"></i></div>
+        <div class="search">
+          <label>
+            <input type="text" placeholder="Search..." />
+            <i class="bx bx-search"></i>
+          </label>
+        </div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User" />
+        </div>
+      </div>
 
-        // Update DateTime
-        function updateDateTime() {
-            document.getElementById('displayDateTime').textContent = new Date().toLocaleString();
-        }
-        setInterval(updateDateTime, 1000);
-        updateDateTime();
-    </script>
+      <!-- ================ Dashboard Content ================ -->
+      <div class="cardBox">
+        <div class="card">
+          <div>
+            <div class="numbers">🐔</div>
+            <div class="cardName">Total Chickens</div>
+          </div>
+          <div class="iconBx"><i class="bx bxs-chicken"></i></div>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="numbers">🌡️</div>
+            <div class="cardName">Temperature</div>
+          </div>
+          <div class="iconBx"><i class="bx bxs-thermometer"></i></div>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="numbers">💧</div>
+            <div class="cardName">Humidity</div>
+          </div>
+          <div class="iconBx"><i class="bx bxs-droplet"></i></div>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="numbers">📅</div>
+            <div class="cardName">Schedule</div>
+          </div>
+          <div class="iconBx"><i class="bx bxs-time-five"></i></div>
+        </div>
+      </div>
+
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>Recent Monitoring Data</h2>
+            <a href="{{ url_for('data_table') }}" class="btn">View All</a>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <td>Date</td>
+                <td>Weight</td>
+                <td>Temperature</td>
+                <td>Humidity</td>
+                <td>Status</td>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for record in records %}
+              <tr>
+                <td>{{ record.date }}</td>
+                <td>{{ record.weight }} g</td>
+                <td>{{ record.temperature }} °C</td>
+                <td>{{ record.humidity }} %</td>
+                <td><span class="status {{ record.status|lower }}">{{ record.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
