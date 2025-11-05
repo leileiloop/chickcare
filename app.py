@@ -17,8 +17,18 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 # Do NOT provide a default value for sensitive keys.
 # Your Render environment variables will provide these.
 app.secret_key = os.environ["SECRET_KEY"]
-DB_URL = os.environ["DATABASE_URL"]
+DB_URL_RAW = os.environ["DATABASE_URL"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
+
+# --- FIX: START ---
+# This block fixes the "invalid connection option" error
+# It ensures the database URL string has the required "postgresql://" prefix.
+if not DB_URL_RAW.startswith("postgresql://"):
+    DB_URL = f"postgresql://{DB_URL_RAW}"
+else:
+    DB_URL = DB_URL_RAW
+# --- FIX: END ---
+
 
 # -------------------------
 # Database setup (IMPROVEMENT: Connection Pooling)
@@ -29,7 +39,8 @@ try:
     pool = ConnectionPool(conninfo=DB_URL, min_size=2, max_size=10, row_factory=dict_row)
     print("Database connection pool created successfully.")
 except Exception as e:
-    print(f"Error creating database connection pool: {e}")
+    # IMPROVEMENT: Print the DB_URL that failed, to help debug environment issues.
+    print(f"Error creating database connection pool with URL: {DB_URL}. Error: {e}")
     # If the app can't connect to the DB, it shouldn't start.
     raise
 
