@@ -19,9 +19,9 @@ logging.basicConfig(level=logging.INFO)
 # Environment Variables
 # -------------------------
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
-missing = [v for v in required_env if v not in os.environ]
-if missing:
-    raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+missing_env = [v for v in required_env if v not in os.environ]
+if missing_env:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env)}")
 
 app.secret_key = os.environ["SECRET_KEY"]
 DB_URL_RAW = os.environ["DATABASE_URL"]
@@ -57,6 +57,7 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
+    """Return a psycopg connection with dict row factory"""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
@@ -213,20 +214,16 @@ def dashboard():
 
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Fetch last 5 records
             cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
             records = cur.fetchall()
 
-            # Total chickens
             cur.execute("SELECT COUNT(*) AS total FROM chickens")
             total_chickens = cur.fetchone()["total"]
 
-            # Latest temperature and humidity
             if records:
                 temperature = records[0]["temperature"]
                 humidity = records[0]["humidity"]
 
-            # Next feeding
             cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
             feed = cur.fetchone()
             if feed:
@@ -378,15 +375,15 @@ def environment():
 @app.route("/feed-schedule")
 @login_required
 def feed_schedule():
-    data = []
+    feeding_schedule = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM sensordata1 ORDER BY id DESC LIMIT 5")
-            data = cur.fetchall()
+            cur.execute("SELECT * FROM feeding_schedule ORDER BY feed_time ASC")
+            feeding_schedule = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load feeding data")
         flash("Could not load feeding data.", "warning")
-    return render_template("feeding.html", data=data)
+    return render_template("feeding.html", feeding_schedule=feeding_schedule)
 
 @app.route("/sanitization")
 @login_required
