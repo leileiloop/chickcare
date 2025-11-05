@@ -103,13 +103,21 @@
               </tr>
             </thead>
             <tbody>
+              <!-- 
+                This will now be populated by the 'records' variable
+                passed from the dashboard() function in app.py
+              -->
               {% for record in records %}
               <tr>
-                <td>{{ record.date }}</td>
-                <td>{{ record.weight }} g</td>
-                <td>{{ record.temperature }} °C</td>
-                <td>{{ record.humidity }} %</td>
-                <td><span class="status {{ record.status|lower }}">{{ record.status }}</span></td>
+                <td>{{ record.date }}</td> <!-- Assuming 'date' is a column name -->
+                <td>{{ record.weight }} g</td> <!-- Assuming 'weight' is a column name -->
+                <td>{{ record.temperature }} °C</td> <!-- Assuming 'temperature' is a column name -->
+                <td>{{ record.humidity }} %</td> <!-- Assuming 'humidity' is a column name -->
+                <td><span class="status {{ record.status|lower }}">{{ record.status }}</span></td> <!-- Assuming 'status' is a column name -->
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5">No recent data found.</td>
               </tr>
               {% endfor %}
             </tbody>
