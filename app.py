@@ -8,7 +8,6 @@ import logging
 import psycopg
 from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
-import secrets
 
 # -------------------------
 # Flask app setup
@@ -30,10 +29,11 @@ MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
 # Normalize DB URL for psycopg
-DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) \
-    if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
+DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
+# -------------------------
 # Flask-Mail setup
+# -------------------------
 app.config.update(
     MAIL_SERVER="smtp.gmail.com",
     MAIL_PORT=587,
@@ -44,7 +44,9 @@ app.config.update(
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
+# -------------------------
 # Session security
+# -------------------------
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -52,7 +54,7 @@ app.config.update(
 )
 
 # -------------------------
-# Database helper
+# Database helpers
 # -------------------------
 def get_conn():
     return psycopg.connect(DB_URL, row_factory=dict_row)
@@ -90,34 +92,45 @@ def role_required(*roles):
 # User helpers
 # -------------------------
 def get_user_by_email(email):
-    with use_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE email=%s", (email,))
-        return cur.fetchone()
+    try:
+        with use_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+            return cur.fetchone()
+    except Exception:
+        app.logger.exception("Error fetching user by email")
+        return None
 
 def get_current_user():
     user_id = session.get("user_id")
     if not user_id:
         return None
-    with use_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-        return cur.fetchone()
+    try:
+        with use_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+            return cur.fetchone()
+    except Exception:
+        app.logger.exception("Error fetching current user")
+        return None
 
 def create_superadmin():
-    """Create superadmin if not exists"""
+    """Create a superadmin if it doesn't exist"""
     super_email = "superadmin@example.com"
-    super_name = "Super Admin"
+    super_username = "superadmin"
     super_pass = generate_password_hash("superadmin123")
-    with use_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE role='superadmin'")
-        if not cur.fetchone():
-            cur.execute(
-                "INSERT INTO users (name,email,password,role,active) VALUES (%s,%s,%s,%s,%s)",
-                (super_name, super_email, super_pass, "superadmin", True)
-            )
-            conn.commit()
-            app.logger.info("Superadmin created")
-        else:
-            app.logger.info("Superadmin already exists")
+    try:
+        with use_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE role='superadmin'")
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
+                    (super_username, super_email, super_pass, "superadmin")
+                )
+                conn.commit()
+                app.logger.info("Superadmin created")
+            else:
+                app.logger.info("Superadmin already exists")
+    except Exception:
+        app.logger.exception("Failed to create superadmin")
 
 create_superadmin()
 
@@ -127,7 +140,8 @@ create_superadmin()
 @app.route("/")
 def home():
     if "user_id" in session:
-        if session.get("user_role") in ["admin", "superadmin"]:
+        role = session.get("user_role")
+        if role in ["admin", "superadmin"]:
             return redirect(url_for("admin_dashboard"))
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
@@ -136,17 +150,17 @@ def home():
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
+        email = request.form.get("email","").strip()
+        password = request.form.get("password","")
         user = get_user_by_email(email)
         if user and check_password_hash(user["password"], password):
             session.update({
                 "user_id": user["id"],
                 "user_role": user.get("role","user"),
-                "user_name": user.get("name"),
+                "user_username": user.get("username"),
                 "user_email": user.get("email")
             })
-            flash(f"Welcome, {user.get('name','User')}!", "success")
+            flash(f"Welcome, {user.get('username','User')}!", "success")
             if user.get("role") in ["admin","superadmin"]:
                 return redirect(url_for("admin_dashboard"))
             return redirect(url_for("dashboard"))
@@ -157,15 +171,15 @@ def login():
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        raw_password = request.form.get("password", "")
-        hashed_pass = generate_password_hash(raw_password)
+        username = request.form.get("username","").strip()
+        email = request.form.get("email","").strip()
+        raw_pass = request.form.get("password","")
+        hashed_pass = generate_password_hash(raw_pass)
         try:
             with use_conn() as conn, conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO users (name,email,password,role) VALUES (%s,%s,%s,%s)",
-                    (name,email,hashed_pass,"user")
+                    "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
+                    (username,email,hashed_pass,"user")
                 )
                 conn.commit()
             flash("Registration successful! Please log in.", "success")
@@ -209,23 +223,23 @@ def profile():
 def settings():
     user = get_current_user()
     if request.method == "POST":
-        name = request.form.get("name","").strip()
+        username = request.form.get("username","").strip()
         email = request.form.get("email","").strip()
         new_pass = request.form.get("password","")
         try:
             with use_conn() as conn, conn.cursor() as cur:
                 if new_pass:
                     cur.execute(
-                        "UPDATE users SET name=%s,email=%s,password=%s WHERE id=%s",
-                        (name,email,generate_password_hash(new_pass),user["id"])
+                        "UPDATE users SET username=%s,email=%s,password=%s WHERE id=%s",
+                        (username,email,generate_password_hash(new_pass),user["id"])
                     )
                 else:
                     cur.execute(
-                        "UPDATE users SET name=%s,email=%s WHERE id=%s",
-                        (name,email,user["id"])
+                        "UPDATE users SET username=%s,email=%s WHERE id=%s",
+                        (username,email,user["id"])
                     )
                 conn.commit()
-            session.update({"user_name":name,"user_email":email})
+            session.update({"user_username":username,"user_email":email})
             flash("Settings updated successfully.", "success")
             return redirect(url_for("settings"))
         except Exception:
@@ -240,7 +254,7 @@ def manage_users():
     users = []
     try:
         with use_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT id,name,email,role,active FROM users ORDER BY id DESC")
+            cur.execute("SELECT id,username,email,role FROM users ORDER BY id DESC")
             users = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load users")
