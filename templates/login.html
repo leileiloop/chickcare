@@ -19,7 +19,7 @@
     }
     .wrapper {
       width: 420px; max-width: 100%;
-      background: transparent;
+      background: rgba(255,255,255,0.05);
       border: 2px solid rgba(255, 255, 255, .2);
       backdrop-filter: blur(60px);
       color: #fff;
@@ -28,7 +28,8 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
     }
     h1 { text-align: center; font-size: 36px; margin-bottom: 20px; }
-    .input-box { position: relative; width: 100%; height: 50px; margin: 30px 0; }
+
+    .input-box { position: relative; width: 100%; height: 50px; margin: 25px 0; }
     .input-box input {
       width: 100%; height: 100%;
       background: transparent; border: 2px solid rgba(255,255,255,0.2);
@@ -38,15 +39,16 @@
     .input-box input::placeholder { color: rgba(255,255,255,0.7); }
     .input-box i { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 20px; }
 
-    .btn { width: 100%; height: 45px; background: #fff; border: none; border-radius: 40px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 16px; color: #333; font-weight: 600;
-      transition: background 0.3s;
+    .btn { width: 100%; height: 45px; border: none; border-radius: 40px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 16px; font-weight: 600;
+      transition: 0.3s;
     }
-    .btn:hover { background: #eee; }
+    .btn-login { background: #fff; color: #333; }
+    .btn-login:hover { background: #eee; }
     .btn-yellow { background: #ffcc00; color: #1f2937; }
     .btn-yellow:hover { background: #ffdb4d; }
 
-    .remember-forgot { display: flex; justify-content: space-between; font-size: 14.5px; margin: -15px 0 15px; }
+    .remember-forgot { display: flex; justify-content: space-between; font-size: 14.5px; margin: -10px 0 15px; }
     .remember-forgot label input { accent-color: #fff; margin-right: 3px; }
     .remember-forgot a { color: #fff; text-decoration: none; }
     .remember-forgot a:hover { text-decoration: underline; }
@@ -82,9 +84,9 @@
       {% endif %}
     {% endwith %}
 
-    <form method="post" action="{{ url_for('login') }}">
+    <form method="POST" action="{{ url_for('login') }}">
       <div class="input-box">
-        <input type="text" name="email" placeholder="Email" required>
+        <input type="email" name="email" placeholder="Email" required>
         <i class='bx bxs-user'></i>
       </div>
       <div class="input-box">
@@ -95,7 +97,8 @@
         <label><input type="checkbox" name="remember"> Remember me</label>
         <a href="#" id="showForgot">Forgot Password?</a>
       </div>
-      <button type="submit" class="btn">Login</button>
+      <button type="submit" class="btn btn-login">Login</button>
+
       <div class="register-link">
         <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
       </div>
@@ -115,7 +118,7 @@
       {% endif %}
     {% endwith %}
 
-    <form method="post" action="{{ url_for('reset_request') }}">
+    <form method="POST" action="{{ url_for('generate') }}">
       <div class="input-box">
         <input type="email" name="email" placeholder="Email Address" required>
         <i class='bx bxs-envelope'></i>
@@ -147,10 +150,9 @@
     loginForm.classList.remove('hidden');
   });
 
-  // Show forgot form if redirected from reset password route
-  window.onload = function() {
-    const path = window.location.pathname;
-    if(path.includes('reset-password')) {
+  // Auto-show forgot form if redirected from reset route
+  window.onload = () => {
+    if(window.location.pathname.includes('reset')) {
       loginForm.classList.add('hidden');
       forgotForm.classList.remove('hidden');
     }
