@@ -110,7 +110,7 @@ def get_current_user():
         return None
 
 def create_superadmin():
-    """Create a superadmin if it doesn't exist"""
+    """Automatically create a superadmin if it doesn't exist"""
     super_email = "superadmin@example.com"
     super_username = "superadmin"
     super_pass = generate_password_hash("superadmin123")
@@ -143,12 +143,11 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# LOGIN
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email","").strip()
-        password = request.form.get("password","")
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
         user = get_user_by_email(email)
         if user and check_password_hash(user["password"], password):
             session.update({
@@ -164,7 +163,6 @@ def login():
         flash("Invalid email or password", "danger")
     return render_template("login.html")
 
-# REGISTER
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
@@ -188,33 +186,28 @@ def register():
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
 
-# LOGOUT
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Logged out successfully.", "info")
     return redirect(url_for("login"))
 
-# DASHBOARD
 @app.route("/dashboard")
 @login_required
 def dashboard():
     return render_template("dashboard.html")
 
-# ADMIN DASHBOARD
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
 def admin_dashboard():
     return render_template("admin-dashboard.html")
 
-# PROFILE
 @app.route("/profile")
 @login_required
 def profile():
     user = get_current_user()
     return render_template("profile.html", user=user)
 
-# SETTINGS
 @app.route("/settings", methods=["GET","POST"])
 @login_required
 def settings():
@@ -244,7 +237,6 @@ def settings():
             flash("Update failed. Try again later.", "danger")
     return render_template("settings.html", user=user)
 
-# MANAGE USERS
 @app.route("/manage-users")
 @role_required("admin","superadmin")
 def manage_users():
