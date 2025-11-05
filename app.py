@@ -196,7 +196,20 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html")
+    """
+    MODIFIED: Fetches recent records to display on the dashboard.
+    """
+    records = []  # Default to an empty list
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            # Fetch the 5 most recent records
+            cur.execute("SELECT * FROM data_table ORDER BY id DESC LIMIT 5")
+            records = cur.fetchall()
+    except Exception:
+        app.logger.exception("Failed to fetch recent records for dashboard")
+        flash("Could not load recent data.", "warning")
+
+    return render_template("dashboard.html", records=records) # Pass 'records' to the template
 
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
@@ -347,6 +360,7 @@ def data_table():
             data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to fetch data table")
+        flash("Could not load data.", "warning")
     return render_template("data_table.html", data=data)
 
 # -------------------------
