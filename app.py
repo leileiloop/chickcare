@@ -1,13 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-import os
+from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import os
 import logging
 import psycopg
 from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
-from werkzeug.security import generate_password_hash, check_password_hash
 
 # Optional connection pooling
 try:
@@ -24,13 +24,8 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO)
 
 # -------------------------
-# ENV VARS (set in Render or .env)
+# Environment variables
 # -------------------------
-# SECRET_KEY=f4e83d6a2c5b47bcb0a9e08f7f91d83d
-# DATABASE_URL=postgresql://chickencaredb_tnrw_user:S5Bb7GdOT6zDwYZy8uJrI762A8aq7nG4@dpg-d447gopr0fns73fssg5g-a.oregon-postgres.render.com/chickencaredb_tnrw
-# MAIL_USERNAME=chickenmonitor1208@gmail.com
-# SMTP_PASSWORD=<your Gmail App Password>
-
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
 missing = [v for v in required_env if v not in os.environ]
 if missing:
@@ -41,18 +36,16 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# Normalize DB URL (some platforms give postgres://)
+# Normalize DB URL
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
-# -------------------------
-# Session cookie hardening
-# -------------------------
+# Session security
 app.config.setdefault("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true")
 app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
 app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
 
 # -------------------------
-# Database setup
+# Database connection
 # -------------------------
 pool = None
 if POOL_AVAILABLE and ConnectionPool:
@@ -60,7 +53,7 @@ if POOL_AVAILABLE and ConnectionPool:
         pool = ConnectionPool(DB_URL, min_size=1, max_size=10)
         app.logger.info("Database connection pool created")
     except Exception as e:
-        app.logger.warning(f"Failed to create pool: {e}")
+        app.logger.warning(f"Failed to create connection pool: {e}")
 
 def get_conn():
     return psycopg.connect(DB_URL, row_factory=dict_row)
@@ -89,25 +82,25 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 def login_required(f):
     @wraps(f)
-    def decorated(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         if "user_id" not in session:
             flash("Please log in first.", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
-    return decorated
+    return wrapper
 
 def admin_required(f):
     @wraps(f)
     @login_required
-    def decorated(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         if session.get("user_role") != "admin":
             flash("You do not have permission to access this page.", "danger")
             return redirect(url_for("dashboard"))
         return f(*args, **kwargs)
-    return decorated
+    return wrapper
 
 # -------------------------
-# Helper: Get current user
+# Helper functions
 # -------------------------
 def get_current_user(user_id):
     try:
@@ -119,6 +112,30 @@ def get_current_user(user_id):
     except Exception:
         app.logger.exception("Failed to fetch current user")
         return None
+
+def create_super_admin():
+    """Automatically create super admin if not exists."""
+    email = "admin"
+    password = "admin"
+    try:
+        with use_conn() as conn:
+            conn.row_factory = dict_row
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+                if not cur.fetchone():
+                    hashed = generate_password_hash(password)
+                    cur.execute(
+                        "INSERT INTO users (name, email, password, role, active) VALUES (%s,%s,%s,%s,%s)",
+                        ("Super Admin", email, hashed, "admin", True)
+                    )
+                    conn.commit()
+                    app.logger.info("Super admin created")
+                else:
+                    app.logger.info("Super admin already exists")
+    except Exception:
+        app.logger.exception("Failed to create super admin")
+
+create_super_admin()
 
 # -------------------------
 # Routes
@@ -132,6 +149,7 @@ def home():
 def login():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
@@ -146,17 +164,20 @@ def login():
             app.logger.exception("DB error during login")
             flash("Database error. Try again later.", "danger")
             return redirect(url_for("login"))
-        if user and user.get("password") and check_password_hash(user["password"], password):
-            session["user_id"] = user["id"]
-            session["user_role"] = user.get("role", "user")
-            session["user_name"] = user.get("name")
-            session["user_email"] = user.get("email")
+
+        if user and check_password_hash(user["password"], password):
+            session.update({
+                "user_id": user["id"],
+                "user_role": user.get("role", "user"),
+                "user_name": user.get("name"),
+                "user_email": user.get("email")
+            })
             flash(f"Welcome, {user.get('name', 'User')}!", "success")
-            if session["user_role"] == "admin":
-                return redirect(url_for("admin_dashboard"))
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("admin_dashboard") if user.get("role") == "admin" else url_for("dashboard"))
+
         flash("Invalid email or password.", "danger")
         return redirect(url_for("login"))
+
     return render_template("login.html")
 
 # REGISTER
@@ -167,12 +188,14 @@ def register():
         email = request.form.get("email", "").strip()
         raw_password = request.form.get("password", "")
         password = generate_password_hash(raw_password)
-        role = "user"
         try:
             with use_conn() as conn:
                 conn.row_factory = dict_row
                 with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)", (name, email, password, role))
+                    cur.execute(
+                        "INSERT INTO users (name,email,password,role) VALUES (%s,%s,%s,%s)",
+                        (name, email, password, "user")
+                    )
                     conn.commit()
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for("login"))
@@ -181,6 +204,7 @@ def register():
         except Exception:
             app.logger.exception("Database error during registration")
             flash("Database error. Try again later.", "danger")
+
     return render_template("register.html")
 
 # DASHBOARD
@@ -199,31 +223,31 @@ def admin_dashboard():
 @app.route("/environment")
 @login_required
 def environment():
-    environment_data = []
+    data = []
     try:
         with use_conn() as conn:
             conn.row_factory = dict_row
             with conn.cursor() as cur:
                 cur.execute("SELECT temperature, humidity, date, time FROM environment ORDER BY date DESC, time DESC LIMIT 50")
-                environment_data = cur.fetchall()
+                data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load environment data")
-    return render_template("environment.html", environment_data=environment_data)
+    return render_template("environment.html", environment_data=data)
 
 # FEED
 @app.route("/feed")
 @login_required
 def feed():
-    feed_data = []
+    data = []
     try:
         with use_conn() as conn:
             conn.row_factory = dict_row
             with conn.cursor() as cur:
                 cur.execute("SELECT date, feed_type, amount, time FROM feed ORDER BY date DESC LIMIT 50")
-                feed_data = cur.fetchall()
+                data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load feed data")
-    return render_template("feed.html", feed_data=feed_data)
+    return render_template("feed.html", feed_data=data)
 
 # GROWTH
 @app.route("/growth")
@@ -247,16 +271,16 @@ def growth():
 @app.route("/data-table")
 @login_required
 def data_table():
-    growth_data = []
+    data = []
     try:
         with use_conn() as conn:
             conn.row_factory = dict_row
             with conn.cursor() as cur:
                 cur.execute("SELECT id, date, temperature, humidity, notes FROM sensor_data ORDER BY date DESC LIMIT 200")
-                growth_data = cur.fetchall()
+                data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load data table")
-    return render_template("data_table.html", growth_data=growth_data)
+    return render_template("data_table.html", growth_data=data)
 
 # PROFILE
 @app.route("/profile")
@@ -280,9 +304,9 @@ def settings():
                 with conn.cursor() as cur:
                     if new_password:
                         hashed = generate_password_hash(new_password)
-                        cur.execute("UPDATE users SET name=%s, email=%s, password=%s WHERE id=%s", (name, email, hashed, user_id))
+                        cur.execute("UPDATE users SET name=%s,email=%s,password=%s WHERE id=%s", (name,email,hashed,user_id))
                     else:
-                        cur.execute("UPDATE users SET name=%s, email=%s WHERE id=%s", (name, email, user_id))
+                        cur.execute("UPDATE users SET name=%s,email=%s WHERE id=%s", (name,email,user_id))
                     conn.commit()
             session["user_name"] = name
             session["user_email"] = email
@@ -303,17 +327,11 @@ def manage_users():
         with use_conn() as conn:
             conn.row_factory = dict_row
             with conn.cursor() as cur:
-                cur.execute("SELECT id, name, email, role, active FROM users ORDER BY id DESC")
+                cur.execute("SELECT id,name,email,role,active FROM users ORDER BY id DESC")
                 users = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load users")
     return render_template("manage-users.html", users=users)
-
-# REPORT
-@app.route("/report")
-@login_required
-def report():
-    return render_template("report.html")
 
 # SANITIZATION
 @app.route("/sanitization")
@@ -324,7 +342,7 @@ def sanitization():
         with use_conn() as conn:
             conn.row_factory = dict_row
             with conn.cursor() as cur:
-                cur.execute("SELECT date, time, area, method, remarks FROM sanitization ORDER BY date DESC LIMIT 50")
+                cur.execute("SELECT date,time,area,method,remarks FROM sanitization ORDER BY date DESC LIMIT 50")
                 data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load sanitization data")
@@ -347,12 +365,13 @@ def forgot_password():
             with use_conn() as conn:
                 conn.row_factory = dict_row
                 with conn.cursor() as cur:
-                    cur.execute("SELECT id, email FROM users WHERE email = %s", (email,))
+                    cur.execute("SELECT id,email FROM users WHERE email=%s", (email,))
                     user = cur.fetchone()
         except Exception:
             app.logger.exception("Database error during forgot_password")
             flash("Database error. Try again later.", "danger")
             return redirect(url_for("forgot_password"))
+
         if user:
             token = serializer.dumps(email, salt="reset-password")
             reset_link = url_for("reset_password", token=token, _external=True)
@@ -364,8 +383,10 @@ def forgot_password():
                 app.logger.exception("Mail send failed")
                 flash("Mail server error. Contact admin.", "danger")
                 return redirect(url_for("forgot_password"))
+
         flash("If your email is registered, instructions have been sent.", "info")
         return redirect(url_for("login"))
+
     return render_template("forgot.html")
 
 # RESET PASSWORD
@@ -379,23 +400,25 @@ def reset_password(token):
     except BadSignature:
         flash("Invalid reset link.", "danger")
         return redirect(url_for("forgot_password"))
+
     if request.method == "POST":
         new_password = generate_password_hash(request.form.get("password", ""))
         try:
             with use_conn() as conn:
                 conn.row_factory = dict_row
                 with conn.cursor() as cur:
-                    cur.execute("UPDATE users SET password = %s WHERE email = %s", (new_password, email))
+                    cur.execute("UPDATE users SET password=%s WHERE email=%s", (new_password, email))
                     conn.commit()
             flash("Password reset successful! Please log in.", "success")
         except Exception:
             app.logger.exception("Database error during password reset")
             flash("Database error. Try again later.", "danger")
         return redirect(url_for("login"))
+
     return render_template("reset_password.html", token=token)
 
 # -------------------------
-# RUN APP
+# Run app
 # -------------------------
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
