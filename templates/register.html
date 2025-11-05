@@ -3,94 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register Form | ChickCare</title>
+  <title>Register | ChickCare</title>
 
   <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
   <!-- Poppins Font -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Poppins", sans-serif; }
-    body {
-      display: flex; justify-content: center; align-items: center; min-height: 100vh;
-      background: url({{ url_for('static', filename='imgs/bg.jpg') }}) no-repeat center center/cover;
-      padding: 20px;
-    }
-    .wrapper {
-      width: 420px; max-width: 100%;
-      background: transparent;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(60px);
-      color: #fff;
-      border-radius: 12px;
-      padding: 30px 40px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    }
-    .wrapper h1 { font-size: 36px; text-align: center; margin-bottom: 20px; }
-    .input-box { position: relative; width: 100%; height: 50px; margin: 25px 0; }
-    .input-box input {
-      width: 100%; height: 100%; background: transparent;
-      border: 2px solid rgba(255,255,255,0.2); border-radius: 40px;
-      padding: 20px 45px 20px 20px; font-size: 16px; color: #fff; outline: none;
-    }
-    .input-box input::placeholder { color: rgba(255,255,255,0.7); }
-    .input-box i { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 20px; }
-    .btn {
-      width: 100%; height: 45px; background: #fff; border: none; border-radius: 40px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1); cursor: pointer; font-size: 16px;
-      color: #333; font-weight: 600; transition: background 0.3s;
-    }
-    .btn:hover { background: #eee; }
-    .login-link { font-size: 14.5px; text-align: center; margin: 20px 0 15px; }
-    .login-link p a { color: #ffcc00; font-weight: 600; text-decoration: none; }
-    .login-link p a:hover { text-decoration: underline; }
-
-    /* Flash messages */
-    .flash-message { padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 14px; font-weight: 500; color: #fff; text-align: center; }
-    .flash-success { background-color: #10b981; border: 1px solid #047857; }
-    .flash-danger { background-color: #ef4444; border: 1px solid #b91c1c; }
-    .flash-warning { background-color: #f59e0b; border: 1px solid #d97706; }
-    .flash-info { background-color: #3b82f6; border: 1px solid #1e40af; }
-  </style>
+  <!-- CSS same as login.html -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <div class="wrapper">
-    <h1>Register</h1>
+  <div class="login-container">
+    <div class="login-form">
+      <h2>Create Account</h2>
 
-    <!-- Flask Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash-message {{ 'flash-' + category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages">
+            {% for category, message in messages %}
+              <p class="{{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
-    <form method="post" action="{{ url_for('register') }}">
-      <div class="input-box">
-        <input type="email" name="email" placeholder="Email" required>
-        <i class='bx bxs-envelope'></i>
-      </div>
+      <form method="POST" action="{{ url_for('register') }}">
+        <div class="input-box">
+          <input type="email" name="email" placeholder="Email" required>
+          <i class='bx bxs-envelope'></i>
+        </div>
 
-      <div class="input-box">
-        <input type="text" name="username" placeholder="Username" required>
-        <i class='bx bxs-user'></i>
-      </div>
+        <div class="input-box">
+          <input type="text" name="username" placeholder="Username" required>
+          <i class='bx bxs-user'></i>
+        </div>
 
-      <div class="input-box">
-        <input type="password" name="password" placeholder="Password" required>
-        <i class='bx bxs-lock-alt'></i>
-      </div>
+        <div class="input-box">
+          <input type="password" name="password" placeholder="Password" required>
+          <i class='bx bxs-lock-alt'></i>
+        </div>
 
-      <input type="hidden" name="role" value="user">
+        <input type="hidden" name="role" value="user">
 
-      <button type="submit" class="btn">Register</button>
+        <button type="submit" class="btn">Register</button>
+      </form>
 
-      <div class="login-link">
-        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
-      </div>
-    </form>
+      <p class="redirect">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    </div>
   </div>
 </body>
 </html>
