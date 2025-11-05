@@ -47,9 +47,8 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 # Session Security
 # -------------------------
-# For local testing, set SESSION_COOKIE_SECURE=False. Set True for production with HTTPS.
 app.config.update(
-    SESSION_COOKIE_SECURE=False,  
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax"
 )
@@ -58,7 +57,6 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
-    """Return a new PostgreSQL connection."""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
@@ -137,17 +135,20 @@ create_superadmin()
 # -------------------------
 @app.route("/")
 def home():
-    """Redirect users based on login state and role."""
-    if "user_id" in session:
-        role = session.get("user_role")
-        if role in ["admin", "superadmin"]:
-            return redirect(url_for("admin_dashboard"))
+    role = session.get("user_role")
+    if role in ["admin", "superadmin"]:
+        return redirect(url_for("admin_dashboard"))
+    elif role:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
 # ----- Auth -----
 @app.route("/login", methods=["GET","POST"])
 def login():
+    if "user_id" in session:
+        role = session.get("user_role")
+        return redirect(url_for("admin_dashboard") if role in ["admin","superadmin"] else url_for("dashboard"))
+
     if request.method == "POST":
         email = request.form.get("email","").strip()
         password = request.form.get("password","")
@@ -166,6 +167,10 @@ def login():
 
 @app.route("/register", methods=["GET","POST"])
 def register():
+    if "user_id" in session:
+        role = session.get("user_role")
+        return redirect(url_for("admin_dashboard") if role in ["admin","superadmin"] else url_for("dashboard"))
+
     if request.method == "POST":
         username = request.form.get("username","").strip()
         email = request.form.get("email","").strip()
@@ -200,14 +205,13 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    """User dashboard with recent records"""
     records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM data_table ORDER BY id DESC LIMIT 5")
             records = cur.fetchall()
     except Exception:
-        app.logger.exception("Failed to fetch recent records")
+        app.logger.exception("Failed to fetch recent records for dashboard")
         flash("Could not load recent data.", "warning")
     return render_template("dashboard.html", records=records)
 
@@ -282,7 +286,7 @@ def generate():
                     "ChickCare Password Reset",
                     sender=MAIL_USERNAME,
                     recipients=[email],
-                    body=f"Hi {user['username']},\nClick the link to reset your password:\n{reset_url}\nIf you didn't request this, ignore this email."
+                    body=f"Hi {user['username']},\nClick the link below to reset your password:\n{reset_url}\nIf you didn't request this, ignore this email."
                 )
                 mail.send(msg)
                 flash("Password reset link sent! Check your email.", "info")
@@ -352,7 +356,6 @@ def report():
 @app.route("/data-table")
 @login_required
 def data_table():
-    """Fetch and show all records"""
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
