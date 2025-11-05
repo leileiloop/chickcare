@@ -9,15 +9,15 @@ import psycopg
 from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
 
-# =========================
+# -------------------------
 # Flask app setup
-# =========================
+# -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO)
 
-# =========================
+# -------------------------
 # Environment variables
-# =========================
+# -------------------------
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
 missing = [v for v in required_env if v not in os.environ]
 if missing:
@@ -28,12 +28,11 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# For compatibility with newer psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
-# =========================
+# -------------------------
 # Flask-Mail setup
-# =========================
+# -------------------------
 app.config.update(
     MAIL_SERVER="smtp.gmail.com",
     MAIL_PORT=587,
@@ -44,24 +43,27 @@ app.config.update(
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
-# =========================
+# -------------------------
 # Session security
-# =========================
+# -------------------------
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax"
 )
 
-# =========================
+# -------------------------
 # Database helpers
-# =========================
+# -------------------------
 def get_conn():
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
-# =========================
+def use_conn():
+    return get_conn()
+
+# -------------------------
 # Decorators
-# =========================
+# -------------------------
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -83,12 +85,12 @@ def role_required(*roles):
         return wrapper
     return decorator
 
-# =========================
+# -------------------------
 # User helpers
-# =========================
+# -------------------------
 def get_user_by_email(email):
     try:
-        with get_conn() as conn, conn.cursor() as cur:
+        with use_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
             return cur.fetchone()
     except Exception:
@@ -100,7 +102,7 @@ def get_current_user():
     if not user_id:
         return None
     try:
-        with get_conn() as conn, conn.cursor() as cur:
+        with use_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
             return cur.fetchone()
     except Exception:
@@ -113,7 +115,7 @@ def create_superadmin():
     super_username = "superadmin"
     super_pass = generate_password_hash("superadmin123")
     try:
-        with get_conn() as conn, conn.cursor() as cur:
+        with use_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role='superadmin'")
             if not cur.fetchone():
                 cur.execute(
@@ -129,9 +131,9 @@ def create_superadmin():
 
 create_superadmin()
 
-# =========================
+# -------------------------
 # Routes
-# =========================
+# -------------------------
 @app.route("/")
 def home():
     role = session.get("user_role")
@@ -141,11 +143,12 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
+# ----- Login -----
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
+        email = request.form.get("email","").strip()
+        password = request.form.get("password","")
         user = get_user_by_email(email)
         if user and check_password_hash(user["password"], password):
             session.update({
@@ -161,6 +164,7 @@ def login():
         flash("Invalid email or password", "danger")
     return render_template("login.html")
 
+# ----- Register -----
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
@@ -169,7 +173,7 @@ def register():
         raw_pass = request.form.get("password","")
         hashed_pass = generate_password_hash(raw_pass)
         try:
-            with get_conn() as conn, conn.cursor() as cur:
+            with use_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
                     (username,email,hashed_pass,"user")
@@ -184,12 +188,14 @@ def register():
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
 
+# ----- Logout -----
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Logged out successfully.", "info")
     return redirect(url_for("login"))
 
+# ----- Dashboard -----
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -215,7 +221,7 @@ def settings():
         email = request.form.get("email","").strip()
         new_pass = request.form.get("password","")
         try:
-            with get_conn() as conn, conn.cursor() as cur:
+            with use_conn() as conn, conn.cursor() as cur:
                 if new_pass:
                     cur.execute(
                         "UPDATE users SET username=%s,email=%s,password=%s WHERE id=%s",
@@ -240,15 +246,59 @@ def settings():
 def manage_users():
     users = []
     try:
-        with get_conn() as conn, conn.cursor() as cur:
+        with use_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT id,username,email,role FROM users ORDER BY id DESC")
             users = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load users")
     return render_template("manage-users.html", users=users)
 
-# =========================
+# -------------------------
+# Password Reset Flow
+# -------------------------
+@app.route("/reset-password", methods=["GET","POST"])
+def reset_request():
+    if request.method == "POST":
+        email = request.form.get("email","").strip()
+        user = get_user_by_email(email)
+        if user:
+            token = serializer.dumps(email, salt="password-reset-salt")
+            reset_url = url_for("reset_with_token", token=token, _external=True)
+            msg = Message("Password Reset Request", sender=MAIL_USERNAME, recipients=[email])
+            msg.body = f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
+            mail.send(msg)
+            flash("Password reset link sent! Check your email.", "info")
+        else:
+            flash("Email not found.", "warning")
+    return render_template("reset_password.html", token="")  # blank token for initial request
+
+@app.route("/reset-password/<token>", methods=["GET","POST"])
+def reset_with_token(token):
+    try:
+        email = serializer.loads(token, salt="password-reset-salt", max_age=3600)  # 1 hour expiry
+    except SignatureExpired:
+        flash("The password reset link has expired.", "danger")
+        return redirect(url_for("reset_request"))
+    except BadSignature:
+        flash("Invalid reset token.", "danger")
+        return redirect(url_for("reset_request"))
+
+    if request.method == "POST":
+        new_pass = request.form.get("password","")
+        hashed_pass = generate_password_hash(new_pass)
+        try:
+            with use_conn() as conn, conn.cursor() as cur:
+                cur.execute("UPDATE users SET password=%s WHERE email=%s", (hashed_pass,email))
+                conn.commit()
+            flash("Password reset successfully! Please log in.", "success")
+            return redirect(url_for("login"))
+        except Exception:
+            app.logger.exception("Failed to reset password")
+            flash("Failed to reset password. Try again later.", "danger")
+    return render_template("reset_password.html", token=token)
+
+# -------------------------
 # Run app
-# =========================
+# -------------------------
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
