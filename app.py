@@ -57,10 +57,8 @@ app.config.update(
 # Database helpers
 # -------------------------
 def get_conn():
+    """Returns a new database connection."""
     return psycopg.connect(DB_URL, row_factory=dict_row)
-
-def use_conn():
-    return get_conn()
 
 # -------------------------
 # Decorators
@@ -91,24 +89,25 @@ def role_required(*roles):
 # -------------------------
 def get_user_by_email(email):
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
             return cur.fetchone()
     except Exception:
         app.logger.exception("Error fetching user by email")
         return None
 
-def get_current_user():
-    user_id = session.get("user_id")
-    if not user_id:
-        return None
+def get_user_by_id(user_id):
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
             return cur.fetchone()
     except Exception:
-        app.logger.exception("Error fetching current user")
+        app.logger.exception("Error fetching user by ID")
         return None
+
+def get_current_user():
+    user_id = session.get("user_id")
+    return get_user_by_id(user_id) if user_id else None
 
 def create_superadmin():
     """Create default superadmin with username 'admin' and password 'admin'."""
@@ -116,7 +115,7 @@ def create_superadmin():
     super_username = "admin"
     super_pass = generate_password_hash("admin")
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role='superadmin'")
             if not cur.fetchone():
                 cur.execute(
@@ -176,7 +175,7 @@ def register():
 
         hashed_pass = generate_password_hash(raw_pass)
         try:
-            with use_conn() as conn, conn.cursor() as cur:
+            with get_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
                     (username,email,hashed_pass,"user")
@@ -185,10 +184,8 @@ def register():
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for("login"))
         except pg_errors.UniqueViolation:
-            conn.rollback()
             flash("Email already registered.", "danger")
         except Exception:
-            conn.rollback()
             app.logger.exception("Registration failed")
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
@@ -231,7 +228,7 @@ def settings():
             return redirect(url_for("settings"))
 
         try:
-            with use_conn() as conn, conn.cursor() as cur:
+            with get_conn() as conn, conn.cursor() as cur:
                 if new_pass:
                     cur.execute(
                         "UPDATE users SET username=%s,email=%s,password=%s WHERE id=%s",
@@ -247,17 +244,17 @@ def settings():
             flash("Settings updated successfully.", "success")
             return redirect(url_for("settings"))
         except Exception:
-            conn.rollback()
             app.logger.exception("Failed to update settings")
             flash("Update failed. Try again later.", "danger")
     return render_template("settings.html", user=user)
 
+# ----- Manage Users -----
 @app.route("/manage-users")
 @role_required("admin","superadmin")
 def manage_users():
     users = []
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT id,username,email,role FROM users ORDER BY id DESC")
             users = cur.fetchall()
     except Exception:
@@ -306,7 +303,7 @@ def reset_with_token(token):
             flash("Password cannot be empty.", "warning")
             return redirect(url_for("reset_with_token", token=token))
         try:
-            with use_conn() as conn, conn.cursor() as cur:
+            with get_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "UPDATE users SET password=%s WHERE email=%s",
                     (generate_password_hash(new_pass), email)
@@ -315,7 +312,6 @@ def reset_with_token(token):
             flash("Password reset successful! You can now log in.", "success")
             return redirect(url_for("login"))
         except Exception:
-            conn.rollback()
             app.logger.exception("Password reset failed")
             flash("Could not reset password. Try again later.", "danger")
     return render_template("reset_password.html", token=token)
@@ -350,4 +346,4 @@ def report():
 # Run app
 # -------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
