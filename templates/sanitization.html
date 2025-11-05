@@ -4,13 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sanitization | ChickCare Dashboard</title>
+  
+  <!-- Main Stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  
+  <!-- Boxicons -->
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 
 <body>
   <div class="container">
-    <!-- =============== Navigation ================ -->
+    <!-- ================= Navigation ================= -->
     <div class="navigation">
       <ul>
         <li>
@@ -19,7 +23,6 @@
             <span class="title">ChickCare</span>
           </a>
         </li>
-
         <li><a href="{{ url_for('dashboard') }}"><i class='bx bx-grid-alt'></i><span class="title">Dashboard</span></a></li>
         <li><a href="{{ url_for('growth') }}"><i class='bx bx-line-chart'></i><span class="title">Growth</span></a></li>
         <li><a href="{{ url_for('environment') }}"><i class='bx bx-leaf'></i><span class="title">Environment</span></a></li>
@@ -30,8 +33,9 @@
       </ul>
     </div>
 
-    <!-- ========================= Main ==================== -->
+    <!-- ================= Main Section ================= -->
     <div class="main">
+      <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
         <div class="search">
@@ -45,7 +49,7 @@
         </div>
       </div>
 
-      <!-- ======================= Sanitization ================== -->
+      <!-- Sanitization Schedule -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
@@ -56,10 +60,10 @@
           <table>
             <thead>
               <tr>
-                <td>Date</td>
-                <td>Time</td>
-                <td>Status</td>
-                <td>Remarks</td>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Remarks</th>
               </tr>
             </thead>
 
@@ -89,6 +93,7 @@
     </div>
   </div>
 
+  <!-- Main JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
