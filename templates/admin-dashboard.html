@@ -1,195 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard | Chick Care</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Tabs */
-        .admin-tabs {
-            margin: 20px 0;
-        }
-        .admin-tabs ul {
-            list-style: none;
-            display: flex;
-            padding: 0;
-            border-bottom: 2px solid #ccc;
-        }
-        .admin-tabs ul li {
-            margin-right: 20px;
-        }
-        .admin-tabs ul li a {
-            text-decoration: none;
-            color: var(--blue, #007BFF);
-            font-weight: bold;
-            padding: 10px;
-            display: block;
-        }
-        .admin-tabs ul li a.active {
-            border-bottom: 3px solid var(--blue, #007BFF);
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | ChickCare</title>
 
-        .tab-content {
-            display: none;
-            padding: 20px 0;
-        }
-        .tab-content.active {
-            display: block;
-        }
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-        }
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .topbar .datetime {
-            font-weight: bold;
-        }
-        .topbar .iconn {
-            position: relative;
-            cursor: pointer;
-        }
-        #notificationCount {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: red;
-            color: white;
-            border-radius: 50%;
-            font-size: 0.7em;
-            padding: 2px 5px;
-        }
-        .user img {
-            width: 40px;
-            border-radius: 50%;
-        }
-    </style>
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
-    <div class="container">
-        <!-- Navigation -->
-        <div class="navigation">
-            <ul>
-                <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
-                <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
-                <li><a href="{{ url_for('logout') }}">Sign Out</a></li>
-            </ul>
-        </div>
+  <div class="container">
+    <!-- ======= Navigation ======= -->
+    <div class="navigation">
+      <ul>
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="title">ChickCare</span>
+          </a>
+        </li>
 
-        <div class="main">
-            <!-- Topbar -->
-            <div class="topbar">
-                <div class="datetime">
-                    <span id="displayDateTime"></span>
-                </div>
-                <div class="iconn" onclick="toggleNotifi()">
-                    <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="Notifications">
-                    <span id="notificationCount">{{ notifications|length }}</span>
-                </div>
-                <div class="user">
-                    <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="Admin">
-                </div>
-            </div>
-
-            <!-- Admin Tabs -->
-            <div class="admin-tabs">
-                <ul>
-                    <li><a href="#manageUsers" class="tab-link active">Manage Users</a></li>
-                    <li><a href="#systemFunctions" class="tab-link">System Functions</a></li>
-                </ul>
-            </div>
-
-            <!-- Tab Contents -->
-            <div id="manageUsers" class="tab-content active">
-                <h1>Manage Users</h1>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>User ID</th>
-                            <th>Email</th>
-                            <th>Username</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
-                            <td>{{ user.id }}</td>
-                            <td>{{ user.Email }}</td>
-                            <td>{{ user.Username }}</td>
-                            <td>
-                                <!-- Example actions -->
-                                <button onclick="editUser('{{ user.id }}')">Edit</button>
-                                <button onclick="deleteUser('{{ user.id }}')">Delete</button>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="systemFunctions" class="tab-content">
-                <h1>System Functions</h1>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>DateTime</th>
-                            <th>Message</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for notif in notifications %}
-                        <tr>
-                            <td>{{ notif.DateTime }}</td>
-                            <td>{{ notif.message }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <li class="active"><a href="{{ url_for('admin_dashboard') }}"><span class="icon"><i class='bx bxs-dashboard'></i></span><span class="title">Admin Dashboard</span></a></li>
+        <li><a href="{{ url_for('manage_users') }}"><span class="icon"><i class='bx bx-user'></i></span><span class="title">Manage Users</span></a></li>
+        <li><a href="{{ url_for('report') }}"><span class="icon"><i class='bx bx-file'></i></span><span class="title">Reports</span></a></li>
+        <li><a href="{{ url_for('logout') }}"><span class="icon"><i class='bx bx-log-out'></i></span><span class="title">Logout</span></a></li>
+      </ul>
     </div>
 
-    <!-- Scripts -->
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-    <script>
-        // Tabs
-        const tabLinks = document.querySelectorAll('.tab-link');
-        const tabContents = document.querySelectorAll('.tab-content');
+    <!-- ======= Main Section ======= -->
+    <div class="main">
+      <div class="topbar">
+        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="title">Admin Control Panel</div>
+      </div>
 
-        tabLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                tabLinks.forEach(l => l.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-                this.classList.add('active');
-                document.querySelector(this.getAttribute('href')).classList.add('active');
-            });
-        });
+      <!-- ======= Dashboard Overview ======= -->
+      <div class="cardBox">
+        <div class="card">
+          <div>
+            <div class="numbers">12</div>
+            <div class="cardName">Active Users</div>
+          </div>
+          <div class="iconBx"><i class='bx bx-user'></i></div>
+        </div>
 
-        // Update DateTime
-        function updateDateTime() {
-            const dt = new Date();
-            document.getElementById('displayDateTime').textContent = dt.toLocaleString();
-        }
-        setInterval(updateDateTime, 1000);
-        updateDateTime();
-    </script>
+        <div class="card">
+          <div>
+            <div class="numbers">5</div>
+            <div class="cardName">Reports</div>
+          </div>
+          <div class="iconBx"><i class='bx bx-file'></i></div>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="numbers">3</div>
+            <div class="cardName">Active Farms</div>
+          </div>
+          <div class="iconBx"><i class='bx bx-home-smile'></i></div>
+        </div>
+
+        <div class="card">
+          <div>
+            <div class="numbers">1</div>
+            <div class="cardName">Alerts</div>
+          </div>
+          <div class="iconBx"><i class='bx bx-bell'></i></div>
+        </div>
+      </div>
+
+      <!-- ======= Recent Activity ======= -->
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>Recent Activity</h2>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Action</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Daniel</td>
+                <td>Added new user account</td>
+                <td>2025-11-05</td>
+              </tr>
+              <tr>
+                <td>Admin</td>
+                <td>Reviewed system reports</td>
+                <td>2025-11-04</td>
+              </tr>
+              <tr>
+                <td>Renz</td>
+                <td>Updated feeding schedule</td>
+                <td>2025-11-03</td>
+              </tr>
+              <!-- Flask will later populate from DB -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= Script ======= -->
+  <script>
+    // Sidebar toggle
+    const toggle = document.querySelector('.toggle');
+    const navigation = document.querySelector('.navigation');
+    const main = document.querySelector('.main');
+    toggle.onclick = function() {
+      navigation.classList.toggle('active');
+      main.classList.toggle('active');
+    };
+  </script>
 </body>
 </html>
