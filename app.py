@@ -28,7 +28,7 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# fix postgres URL prefix for psycopg
+# Fix Postgres URL for psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
@@ -145,7 +145,7 @@ def home():
     return redirect(url_for("login"))
 
 # ----- Login -----
-@app.route("/login", methods=["GET","POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip()
