@@ -4,24 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reports | ChickCare Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-</head>
 
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+</head>
 <body>
   <div class="container">
-    <!-- =============== Navigation ================ -->
+    <!-- ======= Sidebar Navigation ======= -->
     <div class="navigation">
       <ul>
         <li>
           <a href="{{ url_for('dashboard') }}">
-            <span class="icon">
-              <i class='bx bxs-chicken'></i>
-            </span>
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
             <span class="title">ChickCare</span>
           </a>
         </li>
-
         <li><a href="{{ url_for('dashboard') }}"><i class='bx bx-grid-alt'></i><span class="title">Dashboard</span></a></li>
         <li><a href="{{ url_for('growth') }}"><i class='bx bx-line-chart'></i><span class="title">Growth</span></a></li>
         <li><a href="{{ url_for('environment') }}"><i class='bx bx-leaf'></i><span class="title">Environment</span></a></li>
@@ -32,7 +32,7 @@
       </ul>
     </div>
 
-    <!-- ========================= Main ==================== -->
+    <!-- ======= Main Content ======= -->
     <div class="main">
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
@@ -47,7 +47,7 @@
         </div>
       </div>
 
-      <!-- ======================= Report ================== -->
+      <!-- ======= Reports Table ======= -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
@@ -58,14 +58,13 @@
           <table>
             <thead>
               <tr>
-                <td>Report ID</td>
-                <td>Date</td>
-                <td>Type</td>
-                <td>Status</td>
-                <td>Action</td>
+                <th>Report ID</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
-
             <tbody>
               <tr>
                 <td>#RPT-001</td>
@@ -95,6 +94,7 @@
     </div>
   </div>
 
+  <!-- Main JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
