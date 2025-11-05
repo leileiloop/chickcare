@@ -208,7 +208,8 @@ def dashboard():
     records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM data_table ORDER BY id DESC LIMIT 5")
+            # Use sensordata as main table for dashboard
+            cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
             records = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to fetch recent records for dashboard")
@@ -336,12 +337,30 @@ def growth_monitoring():
 @app.route("/environment")
 @login_required
 def environment():
-    return render_template("environment.html")
+    # Fetch last 5 sensor records
+    data = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
+            data = cur.fetchall()
+    except Exception:
+        app.logger.exception("Failed to load environment data")
+        flash("Could not load environment data.", "warning")
+    return render_template("environment.html", data=data)
 
 @app.route("/feed-schedule")
 @login_required
 def feed_schedule():
-    return render_template("feeding.html")
+    # Fetch last 5 food/water control records
+    data = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM sensordata1 ORDER BY id DESC LIMIT 5")
+            data = cur.fetchall()
+    except Exception:
+        app.logger.exception("Failed to load feeding data")
+        flash("Could not load feeding data.", "warning")
+    return render_template("feeding.html", data=data)
 
 @app.route("/sanitization")
 @login_required
@@ -356,10 +375,11 @@ def report():
 @app.route("/data-table")
 @login_required
 def data_table():
+    # Fetch all records from sensordata for display
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM data_table ORDER BY id DESC")
+            cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
             data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to fetch data table")
