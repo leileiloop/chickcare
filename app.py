@@ -201,20 +201,48 @@ def logout():
     flash("Logged out successfully.", "info")
     return redirect(url_for("login"))
 
-# ----- Dashboards -----
+# ----- Dashboard -----
 @app.route("/dashboard")
 @login_required
 def dashboard():
     records = []
+    total_chickens = 0
+    temperature = 0
+    humidity = 0
+    upcoming_feeding = "N/A"
+
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Use sensordata as main table for dashboard
+            # Fetch last 5 records
             cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
             records = cur.fetchall()
+
+            # Total chickens
+            cur.execute("SELECT COUNT(*) AS total FROM chickens")
+            total_chickens = cur.fetchone()["total"]
+
+            # Latest temperature and humidity
+            if records:
+                temperature = records[0]["temperature"]
+                humidity = records[0]["humidity"]
+
+            # Next feeding
+            cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
+            feed = cur.fetchone()
+            if feed:
+                upcoming_feeding = feed["feed_time"].strftime("%H:%M")
     except Exception:
-        app.logger.exception("Failed to fetch recent records for dashboard")
-        flash("Could not load recent data.", "warning")
-    return render_template("dashboard.html", records=records)
+        app.logger.exception("Failed to fetch dashboard data")
+        flash("Could not load dashboard data.", "warning")
+
+    return render_template(
+        "dashboard.html",
+        records=records,
+        total_chickens=total_chickens,
+        temperature=temperature,
+        humidity=humidity,
+        upcoming_feeding=upcoming_feeding
+    )
 
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
@@ -337,7 +365,6 @@ def growth_monitoring():
 @app.route("/environment")
 @login_required
 def environment():
-    # Fetch last 5 sensor records
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
@@ -351,7 +378,6 @@ def environment():
 @app.route("/feed-schedule")
 @login_required
 def feed_schedule():
-    # Fetch last 5 food/water control records
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
@@ -375,7 +401,6 @@ def report():
 @app.route("/data-table")
 @login_required
 def data_table():
-    # Fetch all records from sensordata for display
     data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
