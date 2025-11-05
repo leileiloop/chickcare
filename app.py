@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -28,7 +28,6 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# Normalize DB URL for psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
@@ -60,7 +59,6 @@ def get_conn():
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 def use_conn():
-    """Context manager for database connection"""
     return get_conn()
 
 # -------------------------
@@ -76,7 +74,6 @@ def login_required(f):
     return wrapper
 
 def role_required(*roles):
-    """Require user to have one of the specified roles"""
     def decorator(f):
         @wraps(f)
         @login_required
@@ -139,10 +136,10 @@ create_superadmin()
 # -------------------------
 @app.route("/")
 def home():
-    if "user_id" in session:
-        role = session.get("user_role")
-        if role in ["admin", "superadmin"]:
-            return redirect(url_for("admin_dashboard"))
+    role = session.get("user_role")
+    if role in ["admin", "superadmin"]:
+        return redirect(url_for("admin_dashboard"))
+    elif role:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
@@ -259,51 +256,6 @@ def manage_users():
     except Exception:
         app.logger.exception("Failed to load users")
     return render_template("manage-users.html", users=users)
-
-# FORGOT PASSWORD
-@app.route("/forgot", methods=["GET","POST"])
-def forgot_password():
-    if request.method == "POST":
-        email = request.form.get("email","").strip()
-        user = get_user_by_email(email)
-        if user:
-            token = serializer.dumps(email, salt="reset-password")
-            reset_link = url_for("reset_password", token=token, _external=True)
-            msg = Message("ChickCare Password Reset", sender=MAIL_USERNAME, recipients=[email])
-            msg.html = render_template("reset_email.html", reset_link=reset_link)
-            try:
-                mail.send(msg)
-            except Exception:
-                flash("Unable to send email. Contact admin.", "danger")
-        flash("If your email exists, instructions have been sent.", "info")
-        return redirect(url_for("login"))
-    return render_template("forgot.html")
-
-# RESET PASSWORD
-@app.route("/reset/<token>", methods=["GET","POST"])
-def reset_password(token):
-    try:
-        email = serializer.loads(token, salt="reset-password", max_age=3600)
-    except SignatureExpired:
-        flash("This link has expired.", "danger")
-        return redirect(url_for("forgot_password"))
-    except BadSignature:
-        flash("Invalid reset link.", "danger")
-        return redirect(url_for("forgot_password"))
-
-    if request.method == "POST":
-        new_pass = generate_password_hash(request.form.get("password",""))
-        try:
-            with use_conn() as conn, conn.cursor() as cur:
-                cur.execute("UPDATE users SET password=%s WHERE email=%s", (new_pass,email))
-                conn.commit()
-            flash("Password reset successful! Please log in.", "success")
-        except Exception:
-            app.logger.exception("Failed to reset password")
-            flash("Database error. Try again later.", "danger")
-        return redirect(url_for("login"))
-
-    return render_template("reset_password.html", token=token)
 
 # -------------------------
 # Run app
