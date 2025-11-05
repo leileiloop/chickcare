@@ -15,7 +15,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
   <div class="container">
     <!-- ================== Navigation ================== -->
     <div class="navigation">
@@ -34,7 +33,7 @@
         </li>
         <li>
           <a href="{{ url_for('growth_monitoring') }}">
-            <span class="icon"><i class='bx bxs-doughnut-chart'></i></span>
+            <span class="icon"><i class='bx bxs-bar-chart-square'></i></span>
             <span class="title">Growth Monitoring</span>
           </a>
         </li>
@@ -77,13 +76,11 @@
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
         <div class="search">
-          <label>
-            <input type="text" placeholder="Search here">
-            <i class='bx bx-search'></i>
-          </label>
+          <input type="text" placeholder="Search here">
+          <i class='bx bx-search'></i>
         </div>
         <div class="user">
-          <img src="{{ url_for('static', filename='img/user.jpg') }}" alt="User">
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User">
         </div>
       </div>
 
