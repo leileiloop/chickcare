@@ -10,13 +10,13 @@ from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
 
 # -------------------------
-# Flask app setup
+# Flask App Setup
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO)
 
 # -------------------------
-# Environment variables
+# Environment Variables
 # -------------------------
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
 missing = [v for v in required_env if v not in os.environ]
@@ -24,14 +24,12 @@ if missing:
     raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
 
 app.secret_key = os.environ["SECRET_KEY"]
-DB_URL_RAW = os.environ["DATABASE_URL"]
+DB_URL = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
-
 # -------------------------
-# Flask-Mail setup
+# Flask-Mail Setup
 # -------------------------
 app.config.update(
     MAIL_SERVER="smtp.gmail.com",
@@ -44,7 +42,7 @@ mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------------
-# Session security
+# Session Security
 # -------------------------
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -53,13 +51,10 @@ app.config.update(
 )
 
 # -------------------------
-# Database helpers
+# Database Helpers
 # -------------------------
 def get_conn():
     return psycopg.connect(DB_URL, row_factory=dict_row)
-
-def use_conn():
-    return get_conn()
 
 # -------------------------
 # Decorators
@@ -86,11 +81,11 @@ def role_required(*roles):
     return decorator
 
 # -------------------------
-# User helpers
+# User Helpers
 # -------------------------
 def get_user_by_email(email):
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
             return cur.fetchone()
     except Exception:
@@ -102,20 +97,22 @@ def get_current_user():
     if not user_id:
         return None
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
             return cur.fetchone()
     except Exception:
         app.logger.exception("Error fetching current user")
         return None
 
+# -------------------------
+# Superadmin Auto-Creation
+# -------------------------
 def create_superadmin():
-    """Automatically create a superadmin if it doesn't exist"""
     super_email = "superadmin@example.com"
     super_username = "superadmin"
     super_pass = generate_password_hash("superadmin123")
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role='superadmin'")
             if not cur.fetchone():
                 cur.execute(
@@ -124,8 +121,6 @@ def create_superadmin():
                 )
                 conn.commit()
                 app.logger.info("Superadmin created")
-            else:
-                app.logger.info("Superadmin already exists")
     except Exception:
         app.logger.exception("Failed to create superadmin")
 
@@ -137,13 +132,12 @@ create_superadmin()
 @app.route("/")
 def home():
     role = session.get("user_role")
-    if role in ["admin", "superadmin"]:
+    if role in ["admin","superadmin"]:
         return redirect(url_for("admin_dashboard"))
     elif role:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# ----- Login -----
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -158,13 +152,10 @@ def login():
                 "user_email": user.get("email")
             })
             flash(f"Welcome, {user.get('username','User')}!", "success")
-            if user.get("role") in ["admin","superadmin"]:
-                return redirect(url_for("admin_dashboard"))
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("admin_dashboard") if user.get("role") in ["admin","superadmin"] else url_for("dashboard"))
         flash("Invalid email or password", "danger")
     return render_template("login.html")
 
-# ----- Register -----
 @app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
@@ -173,7 +164,7 @@ def register():
         raw_pass = request.form.get("password","")
         hashed_pass = generate_password_hash(raw_pass)
         try:
-            with use_conn() as conn, conn.cursor() as cur:
+            with get_conn() as conn, conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
                     (username,email,hashed_pass,"user")
@@ -188,14 +179,12 @@ def register():
             flash("Database error. Try again later.", "danger")
     return render_template("register.html")
 
-# ----- Logout -----
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Logged out successfully.", "info")
     return redirect(url_for("login"))
 
-# ----- Dashboard -----
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -221,17 +210,13 @@ def settings():
         email = request.form.get("email","").strip()
         new_pass = request.form.get("password","")
         try:
-            with use_conn() as conn, conn.cursor() as cur:
+            with get_conn() as conn, conn.cursor() as cur:
                 if new_pass:
-                    cur.execute(
-                        "UPDATE users SET username=%s,email=%s,password=%s WHERE id=%s",
-                        (username,email,generate_password_hash(new_pass),user["id"])
-                    )
+                    cur.execute("UPDATE users SET username=%s,email=%s,password=%s WHERE id=%s",
+                                (username,email,generate_password_hash(new_pass),user["id"]))
                 else:
-                    cur.execute(
-                        "UPDATE users SET username=%s,email=%s WHERE id=%s",
-                        (username,email,user["id"])
-                    )
+                    cur.execute("UPDATE users SET username=%s,email=%s WHERE id=%s",
+                                (username,email,user["id"]))
                 conn.commit()
             session.update({"user_username":username,"user_email":email})
             flash("Settings updated successfully.", "success")
@@ -246,16 +231,14 @@ def settings():
 def manage_users():
     users = []
     try:
-        with use_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT id,username,email,role FROM users ORDER BY id DESC")
             users = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load users")
     return render_template("manage-users.html", users=users)
 
-# -------------------------
-# Password Reset Flow
-# -------------------------
+# ----- Password Reset -----
 @app.route("/reset-password", methods=["GET","POST"])
 def reset_request():
     if request.method == "POST":
@@ -270,12 +253,12 @@ def reset_request():
             flash("Password reset link sent! Check your email.", "info")
         else:
             flash("Email not found.", "warning")
-    return render_template("reset_password.html", token="")  # blank token for initial request
+    return render_template("reset_password.html", token="")
 
 @app.route("/reset-password/<token>", methods=["GET","POST"])
 def reset_with_token(token):
     try:
-        email = serializer.loads(token, salt="password-reset-salt", max_age=3600)  # 1 hour expiry
+        email = serializer.loads(token, salt="password-reset-salt", max_age=3600)
     except SignatureExpired:
         flash("The password reset link has expired.", "danger")
         return redirect(url_for("reset_request"))
@@ -285,10 +268,9 @@ def reset_with_token(token):
 
     if request.method == "POST":
         new_pass = request.form.get("password","")
-        hashed_pass = generate_password_hash(new_pass)
         try:
-            with use_conn() as conn, conn.cursor() as cur:
-                cur.execute("UPDATE users SET password=%s WHERE email=%s", (hashed_pass,email))
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute("UPDATE users SET password=%s WHERE email=%s", (generate_password_hash(new_pass), email))
                 conn.commit()
             flash("Password reset successfully! Please log in.", "success")
             return redirect(url_for("login"))
@@ -298,7 +280,7 @@ def reset_with_token(token):
     return render_template("reset_password.html", token=token)
 
 # -------------------------
-# Run app
+# Run App
 # -------------------------
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
