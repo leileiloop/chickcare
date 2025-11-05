@@ -27,10 +27,10 @@
         </li>
         <li><a href="{{ url_for('dashboard') }}" class="active"><i class="bx bxs-dashboard"></i><span class="title">Dashboard</span></a></li>
         <li><a href="{{ url_for('growth_monitoring') }}"><i class="bx bxs-bar-chart-square"></i><span class="title">Growth Tracking</span></a></li>
-        <li><a href="{{ url_for('feeding_schedule') }}"><i class="bx bxs-bowl-rice"></i><span class="title">Feeding Schedule</span></a></li>
+        <li><a href="{{ url_for('feed_schedule') }}"><i class="bx bxs-bowl-rice"></i><span class="title">Feeding Schedule</span></a></li>
         <li><a href="{{ url_for('environment') }}"><i class="bx bxs-thermometer"></i><span class="title">Environment</span></a></li>
         <li><a href="{{ url_for('sanitization') }}"><i class="bx bxs-virus"></i><span class="title">Sanitization</span></a></li>
-        {% if session['user_role'] == 'admin' %}
+        {% if session.get('user_role') in ['admin', 'superadmin'] %}
         <li><a href="{{ url_for('manage_users') }}"><i class="bx bxs-user-account"></i><span class="title">Manage Users</span></a></li>
         {% endif %}
         <li><a href="{{ url_for('report') }}"><i class="bx bxs-file"></i><span class="title">Report</span></a></li>
@@ -56,7 +56,7 @@
       <div class="cardBox">
         <div class="card">
           <div>
-            <div class="numbers">{{ total_chickens }}</div>
+            <div class="numbers">{{ total_chickens or 0 }}</div>
             <div class="cardName">Total Chickens</div>
           </div>
           <div class="iconBx"><i class="bx bxs-chicken"></i></div>
@@ -64,7 +64,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ temperature }} °C</div>
+            <div class="numbers">{{ temperature or 0 }} °C</div>
             <div class="cardName">Temperature</div>
           </div>
           <div class="iconBx"><i class="bx bxs-thermometer"></i></div>
@@ -72,7 +72,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ humidity }} %</div>
+            <div class="numbers">{{ humidity or 0 }} %</div>
             <div class="cardName">Humidity</div>
           </div>
           <div class="iconBx"><i class="bx bxs-droplet"></i></div>
@@ -80,7 +80,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ upcoming_feeding }}</div>
+            <div class="numbers">{{ upcoming_feeding or "N/A" }}</div>
             <div class="cardName">Next Feeding</div>
           </div>
           <div class="iconBx"><i class="bx bxs-time-five"></i></div>
@@ -109,11 +109,11 @@
               {% if records %}
                 {% for record in records %}
                 <tr>
-                  <td>{{ record.date }}</td>
-                  <td>{{ record.weight }}</td>
-                  <td>{{ record.temperature }}</td>
-                  <td>{{ record.humidity }}</td>
-                  <td><span class="status {{ record.status|lower }}">{{ record.status }}</span></td>
+                  <td>{{ record['date'] }}</td>
+                  <td>{{ record['weight'] }}</td>
+                  <td>{{ record['temperature'] }}</td>
+                  <td>{{ record['humidity'] }}</td>
+                  <td><span class="status {{ record['status']|lower }}">{{ record['status'] }}</span></td>
                 </tr>
                 {% endfor %}
               {% else %}
