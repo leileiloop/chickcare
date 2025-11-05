@@ -11,14 +11,16 @@
   <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
 
-  <!-- CSS -->
+  <!-- Main CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
   <div class="container">
-    <!-- =============== Navigation ================ -->
+    <!-- ================== Navigation ================== -->
     <div class="navigation">
       <ul>
         <li>
@@ -27,49 +29,42 @@
             <span class="title">ChickCare</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('dashboard') }}">
             <span class="icon"><i class="bx bxs-dashboard"></i></span>
             <span class="title">Dashboard</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('growth_monitoring') }}" class="active">
             <span class="icon"><i class="bx bxs-bar-chart-square"></i></span>
             <span class="title">Growth</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('data_table') }}">
             <span class="icon"><i class="bx bxs-data"></i></span>
             <span class="title">Data Table</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('feeding_schedule') }}">
             <span class="icon"><i class="bx bxs-time-five"></i></span>
             <span class="title">Feeding Schedule</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('environment') }}">
             <span class="icon"><i class="bx bxs-thermometer"></i></span>
             <span class="title">Environment</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('sanitization') }}">
             <span class="icon"><i class="bx bxs-virus"></i></span>
             <span class="title">Sanitization</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('logout') }}">
             <span class="icon"><i class="bx bx-log-out"></i></span>
@@ -79,8 +74,9 @@
       </ul>
     </div>
 
-    <!-- ========================= Main ==================== -->
+    <!-- ================= Main Section ================= -->
     <div class="main">
+      <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class="bx bx-menu"></i></div>
         <div class="search">
@@ -94,20 +90,20 @@
         </div>
       </div>
 
-      <!-- ================ Growth Monitoring Chart ================ -->
+      <!-- Growth Monitoring Chart -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
             <h2>Growth Progress</h2>
             <a href="{{ url_for('data_table') }}" class="btn">View Records</a>
           </div>
-
           <canvas id="growthChart" width="100%" height="40"></canvas>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Chart.js Script -->
   <script>
     const ctx = document.getElementById('growthChart').getContext('2d');
     const growthChart = new Chart(ctx, {
@@ -137,17 +133,14 @@
           }
         },
         scales: {
-          x: {
-            title: { display: true, text: 'Date' }
-          },
-          y: {
-            title: { display: true, text: 'Weight (g)' }
-          }
+          x: { title: { display: true, text: 'Date' } },
+          y: { title: { display: true, text: 'Weight (g)' } }
         }
       }
     });
   </script>
 
+  <!-- Main JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
