@@ -5,14 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Feeding Schedule | ChickCare</title>
 
-  <!-- ======= Styles ====== -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-</head>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
 <body>
+
   <div class="container">
-    <!-- =============== Navigation ================ -->
+    <!-- ================== Navigation ================== -->
     <div class="navigation">
       <ul>
         <li>
@@ -21,49 +26,42 @@
             <span class="title">ChickCare</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('dashboard') }}">
             <span class="icon"><i class='bx bxs-dashboard'></i></span>
             <span class="title">Dashboard</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('growth_monitoring') }}">
             <span class="icon"><i class='bx bxs-doughnut-chart'></i></span>
             <span class="title">Growth Monitoring</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('data_table') }}">
             <span class="icon"><i class='bx bx-table'></i></span>
             <span class="title">Data Table</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('feeding_schedule') }}" class="active">
             <span class="icon"><i class='bx bxs-bowl-rice'></i></span>
             <span class="title">Feeding Schedule</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('environment') }}">
             <span class="icon"><i class='bx bxs-thermometer'></i></span>
             <span class="title">Environment</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('sanitization') }}">
             <span class="icon"><i class='bx bxs-virus'></i></span>
             <span class="title">Sanitization</span>
           </a>
         </li>
-
         <li>
           <a href="{{ url_for('logout') }}">
             <span class="icon"><i class='bx bx-log-out'></i></span>
@@ -73,8 +71,9 @@
       </ul>
     </div>
 
-    <!-- ========================= Main ==================== -->
+    <!-- ================= Main Section ================= -->
     <div class="main">
+      <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
         <div class="search">
@@ -88,7 +87,7 @@
         </div>
       </div>
 
-      <!-- ======================= Feeding Schedule ================== -->
+      <!-- Feeding Schedule Table -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
@@ -112,7 +111,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="3" style="text-align: center;">No feeding data available</td>
+                <td colspan="3" style="text-align:center;">No feeding data available</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -122,6 +121,7 @@
     </div>
   </div>
 
+  <!-- Main JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
