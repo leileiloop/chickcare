@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.pool import ConnectionPool
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from functools import wraps
@@ -11,18 +12,26 @@ from functools import wraps
 # Flask app setup
 # -------------------------
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = os.environ.get("SECRET_KEY", "sk-04b6eafca8b7f1a91e6e9d3d8ce8ef2c")
+
+# FIX (Security): Load secrets ONLY from environment variables. 
+# Do NOT provide a default value for sensitive keys.
+# Your Render environment variables will provide these.
+app.secret_key = os.environ["SECRET_KEY"]
+DB_URL = os.environ["DATABASE_URL"]
+SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
 # -------------------------
-# Database setup
+# Database setup (IMPROVEMENT: Connection Pooling)
 # -------------------------
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://chickencaredb_tnrw_user:S5Bb7GdOT6zDwYZy8uJrI762A8aq7nG4@dpg-d447gopr0fns73fssg5g-a.oregon-postgres.render.com/chickencaredb_tnrw?sslmode=require"
-)
-
-def get_db():
-    return psycopg.connect(DB_URL, row_factory=dict_row)
+# Create one connection pool when the app starts.
+# This pool will manage all database connections for efficiency.
+try:
+    pool = ConnectionPool(conninfo=DB_URL, min_size=2, max_size=10, row_factory=dict_row)
+    print("Database connection pool created successfully.")
+except Exception as e:
+    print(f"Error creating database connection pool: {e}")
+    # If the app can't connect to the DB, it shouldn't start.
+    raise
 
 # -------------------------
 # Flask-Mail setup
@@ -32,20 +41,32 @@ app.config.update(
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
     MAIL_USERNAME="chickenmonitor1208@gmail.com",
-    MAIL_PASSWORD=os.environ.get("SMTP_PASSWORD", "leinadloki012"),
+    MAIL_PASSWORD=SMTP_PASSWORD,  # FIX (Security): Load from env var
 )
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------------
-# Helper: login required
+# Helper: Decorators
 # -------------------------
 def login_required(f):
+    """Ensures a user is logged in."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_role" not in session:
             flash("Please log in first.", "warning")
             return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    """Ensures a user is logged in AND has the 'admin' role."""
+    @wraps(f)
+    @login_required  # Ensures user is logged in first
+    def decorated(*args, **kwargs):
+        if session.get("user_role") != "admin":
+            flash("You do not have permission to access this page.", "danger")
+            return redirect(url_for("dashboard"))
         return f(*args, **kwargs)
     return decorated
 
@@ -59,30 +80,38 @@ def home():
 # LOGIN
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if "user_role" in session:
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-
-        # SUPER ADMIN
-        if email == "admin" and password == "admin":
-            session["user_role"] = "admin"
-            flash("Welcome Super Admin!", "success")
-            return redirect(url_for("dashboard"))
-
+        
+        # FIX (Security): Removed hardcoded admin backdoor.
+        # Admin must log in via the database.
+        
         try:
-            with get_db() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-                user = cur.fetchone()
-        except Exception as e:
+            # IMPROVEMENT: Use the connection pool
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                    user = cur.fetchone()
+        
+        # IMPROVEMENT: Catch specific database errors
+        except psycopg.Error as e:
             flash(f"Database error: {e}", "danger")
             return redirect(url_for("login"))
 
         if user and check_password_hash(user["password"], password):
             session["user_id"] = user["id"]
             session["user_role"] = user["role"]
-            flash("Login successful!", "success")
-            return redirect(url_for("dashboard"))
+            flash(f"Welcome, {user['name']}!", "success")
+            
+            # IMPROVEMENT: Route admin to admin-dashboard
+            if user["role"] == "admin":
+                return redirect(url_for("admin_dashboard"))
+            else:
+                return redirect(url_for("dashboard"))
         else:
             flash("Invalid email or password.", "danger")
             return redirect(url_for("login"))
@@ -96,33 +125,39 @@ def register():
         name = request.form["name"]
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
-        role = "user"
+        role = "user"  # Default role
 
         try:
-            with get_db() as conn:
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
-                    (name, email, password, role),
-                )
-                conn.commit()
-                flash("Registration successful! Please log in.", "success")
-                return redirect(url_for("login"))
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
+                        (name, email, password, role),
+                    )
+                    conn.commit()
+            
+            flash("Registration successful! Please log in.", "success")
+            return redirect(url_for("login"))
+        
         except psycopg.errors.UniqueViolation:
-            conn.rollback()
             flash("This email is already registered.", "danger")
-        except Exception as e:
+        except psycopg.Error as e:
             flash(f"Database error: {e}", "danger")
 
     return render_template("register.html")
 
-# DASHBOARD
+# DASHBOARD (for regular users)
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    if session["user_role"] == "admin":
-        return render_template("admin-dashboard.html")
+    # This is now the main user dashboard
     return render_template("dashboard.html")
+
+# ADMIN DASHBOARD (for admins)
+@app.route("/admin-dashboard")
+@admin_required  # FIX (Security): Protected this route
+def admin_dashboard():
+    return render_template("admin-dashboard.html")
 
 @app.route("/main-dashboard")
 @login_required
@@ -145,7 +180,7 @@ def growth():
     return render_template("growth.html")
 
 @app.route("/manage-users")
-@login_required
+@admin_required  # FIX (Security): Protected this route
 def manage_users():
     return render_template("manage-users.html")
 
@@ -171,12 +206,13 @@ def logout():
 def forgot_password():
     if request.method == "POST":
         email = request.form["email"]
+        user = None
         try:
-            with get_db() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-                user = cur.fetchone()
-        except Exception as e:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                    user = cur.fetchone()
+        except psycopg.Error as e:
             flash(f"Database error: {e}", "danger")
             return redirect(url_for("forgot_password"))
 
@@ -189,9 +225,15 @@ def forgot_password():
                 recipients=[email],
             )
             msg.html = render_template("reset_password.html", reset_link=reset_link)
-            mail.send(msg)
+            
+            try:
+                mail.send(msg)
+                flash("If your email is registered, instructions have been sent.", "info")
+            except Exception as e:
+                flash(f"Mail server error: {e}", "danger")
+        else:
+             flash("If your email is registered, instructions have been sent.", "info")
 
-        flash("If your email is registered, instructions have been sent.", "info")
         return redirect(url_for("login"))
 
     return render_template("forgot.html")
@@ -211,13 +253,14 @@ def reset_password(token):
     if request.method == "POST":
         new_password = generate_password_hash(request.form["password"])
         try:
-            with get_db() as conn:
-                cur = conn.cursor()
-                cur.execute("UPDATE users SET password = %s WHERE email = %s", (new_password, email))
-                conn.commit()
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE users SET password = %s WHERE email = %s", (new_password, email))
+                    conn.commit()
             flash("Password reset successful! Please log in.", "success")
-        except Exception as e:
+        except psycopg.Error as e:
             flash(f"Database error: {e}", "danger")
+        
         return redirect(url_for("login"))
 
     return render_template("reset_password.html", token=token)
