@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login & Reset | Dan Aleko</title>
+  <title>Login chickencare</title>
 
   <!-- Boxicons -->
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
@@ -63,6 +63,7 @@
     .flash-success { background-color: #10b981; border: 1px solid #047857; }
     .flash-danger { background-color: #ef4444; border: 1px solid #b91c1c; }
     .flash-warning { background-color: #f59e0b; border: 1px solid #d97706; }
+    .flash-info { background-color: #3b82f6; border: 1px solid #1e40af; }
   </style>
 </head>
 <body>
@@ -114,7 +115,7 @@
       {% endif %}
     {% endwith %}
 
-    <form method="post" action="{{ url_for('forgot_password') }}">
+    <form method="post" action="{{ url_for('reset_request') }}">
       <div class="input-box">
         <input type="email" name="email" placeholder="Email Address" required>
         <i class='bx bxs-envelope'></i>
@@ -133,21 +134,23 @@
 <script>
   const loginForm = document.getElementById('loginForm');
   const forgotForm = document.getElementById('forgotForm');
+
   document.getElementById('showForgot').addEventListener('click', e => {
     e.preventDefault();
     loginForm.classList.add('hidden');
     forgotForm.classList.remove('hidden');
   });
+
   document.getElementById('showLogin').addEventListener('click', e => {
     e.preventDefault();
     forgotForm.classList.add('hidden');
     loginForm.classList.remove('hidden');
   });
 
-  // Optionally show forgot form if redirected to forgot route
+  // Show forgot form if redirected from reset password route
   window.onload = function() {
     const path = window.location.pathname;
-    if(path.includes('forgot')) {
+    if(path.includes('reset-password')) {
       loginForm.classList.add('hidden');
       forgotForm.classList.remove('hidden');
     }
