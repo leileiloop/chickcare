@@ -1,72 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard | ChickCare</title>
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
 
   <!-- Boxicons -->
-  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
 
-  <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
   <div class="container">
-    <!-- ======= Navigation ======= -->
+    <!-- ================= Navigation ================= -->
     <div class="navigation">
       <ul>
         <li>
           <a href="{{ url_for('dashboard') }}">
-            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="icon"><i class="bx bxs-chicken"></i></span>
             <span class="title">ChickCare</span>
           </a>
         </li>
         <li class="active">
           <a href="{{ url_for('admin_dashboard') }}">
-            <span class="icon"><i class='bx bxs-dashboard'></i></span>
+            <span class="icon"><i class="bx bxs-dashboard"></i></span>
             <span class="title">Admin Dashboard</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('manage_users') }}">
-            <span class="icon"><i class='bx bx-user'></i></span>
+            <span class="icon"><i class="bx bx-user"></i></span>
             <span class="title">Manage Users</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('report') }}">
-            <span class="icon"><i class='bx bx-file'></i></span>
+            <span class="icon"><i class="bx bx-file"></i></span>
             <span class="title">Reports</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('logout') }}">
-            <span class="icon"><i class='bx bx-log-out'></i></span>
+            <span class="icon"><i class="bx bx-log-out"></i></span>
             <span class="title">Logout</span>
           </a>
         </li>
       </ul>
     </div>
 
-    <!-- ======= Main Section ======= -->
+    <!-- ================= Main ================= -->
     <div class="main">
+      <!-- Topbar -->
       <div class="topbar">
-        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="toggle"><i class="bx bx-menu"></i></div>
         <div class="title">Admin Control Panel</div>
       </div>
 
-      <!-- ======= Dashboard Overview ======= -->
+      <!-- Dashboard Cards -->
       <div class="cardBox">
         <div class="card">
           <div>
             <div class="numbers">{{ active_users }}</div>
             <div class="cardName">Active Users</div>
           </div>
-          <div class="iconBx"><i class='bx bx-user'></i></div>
+          <div class="iconBx"><i class="bx bx-user"></i></div>
         </div>
 
         <div class="card">
@@ -74,7 +75,7 @@
             <div class="numbers">{{ reports_count }}</div>
             <div class="cardName">Reports</div>
           </div>
-          <div class="iconBx"><i class='bx bx-file'></i></div>
+          <div class="iconBx"><i class="bx bx-file"></i></div>
         </div>
 
         <div class="card">
@@ -82,7 +83,7 @@
             <div class="numbers">{{ active_farms }}</div>
             <div class="cardName">Active Farms</div>
           </div>
-          <div class="iconBx"><i class='bx bx-home-smile'></i></div>
+          <div class="iconBx"><i class="bx bx-home-smile"></i></div>
         </div>
 
         <div class="card">
@@ -90,11 +91,11 @@
             <div class="numbers">{{ alerts_count }}</div>
             <div class="cardName">Alerts</div>
           </div>
-          <div class="iconBx"><i class='bx bx-bell'></i></div>
+          <div class="iconBx"><i class="bx bx-bell"></i></div>
         </div>
       </div>
 
-      <!-- ======= Recent Activity ======= -->
+      <!-- Recent Activity Table -->
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
@@ -124,7 +125,7 @@
     </div>
   </div>
 
-  <!-- ======= Script ======= -->
+  <!-- ======= Scripts ======= -->
   <script>
     // Sidebar toggle
     const toggle = document.querySelector('.toggle');
