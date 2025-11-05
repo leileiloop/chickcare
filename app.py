@@ -28,6 +28,7 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
+# fix postgres URL prefix for psycopg
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
@@ -110,9 +111,10 @@ def get_current_user():
         return None
 
 def create_superadmin():
+    """Create default superadmin with username 'admin' and password 'admin'."""
     super_email = "superadmin@example.com"
-    super_username = "superadmin"
-    super_pass = generate_password_hash("superadmin123")
+    super_username = "admin"
+    super_pass = generate_password_hash("admin")
     try:
         with use_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role='superadmin'")
@@ -146,8 +148,8 @@ def home():
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email","").strip()
-        password = request.form.get("password","")
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
         user = get_user_by_email(email)
         if user and check_password_hash(user["password"], password):
             session.update({
@@ -157,9 +159,7 @@ def login():
                 "user_email": user.get("email")
             })
             flash(f"Welcome, {user.get('username','User')}!", "success")
-            if user.get("role") in ["admin","superadmin"]:
-                return redirect(url_for("admin_dashboard"))
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("admin_dashboard") if user.get("role") in ["admin","superadmin"] else url_for("dashboard"))
         flash("Invalid email or password", "danger")
     return render_template("login.html")
 
@@ -170,6 +170,10 @@ def register():
         username = request.form.get("username","").strip()
         email = request.form.get("email","").strip()
         raw_pass = request.form.get("password","")
+        if not username or not email or not raw_pass:
+            flash("All fields are required.", "warning")
+            return redirect(url_for("register"))
+
         hashed_pass = generate_password_hash(raw_pass)
         try:
             with use_conn() as conn, conn.cursor() as cur:
@@ -222,6 +226,10 @@ def settings():
         username = request.form.get("username","").strip()
         email = request.form.get("email","").strip()
         new_pass = request.form.get("password","")
+        if not username or not email:
+            flash("Username and email cannot be empty.", "warning")
+            return redirect(url_for("settings"))
+
         try:
             with use_conn() as conn, conn.cursor() as cur:
                 if new_pass:
@@ -263,16 +271,20 @@ def generate():
         email = request.form.get("email","").strip()
         user = get_user_by_email(email)
         if user:
-            token = serializer.dumps(email, salt="password-reset-salt")
-            reset_url = url_for("reset_with_token", token=token, _external=True)
-            msg = Message(
-                "ChickCare Password Reset",
-                sender=MAIL_USERNAME,
-                recipients=[email],
-                body=f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
-            )
-            mail.send(msg)
-            flash("Password reset link sent! Check your email.", "info")
+            try:
+                token = serializer.dumps(email, salt="password-reset-salt")
+                reset_url = url_for("reset_with_token", token=token, _external=True)
+                msg = Message(
+                    "ChickCare Password Reset",
+                    sender=MAIL_USERNAME,
+                    recipients=[email],
+                    body=f"Hi {user['username']},\n\nClick the link below to reset your password:\n{reset_url}\n\nIf you didn't request this, ignore this email."
+                )
+                mail.send(msg)
+                flash("Password reset link sent! Check your email.", "info")
+            except Exception:
+                app.logger.exception("Failed to send email")
+                flash("Failed to send reset email. Try again later.", "danger")
         else:
             flash("Email not found.", "warning")
     return render_template("generate.html")
@@ -290,6 +302,9 @@ def reset_with_token(token):
 
     if request.method == "POST":
         new_pass = request.form.get("password","")
+        if not new_pass:
+            flash("Password cannot be empty.", "warning")
+            return redirect(url_for("reset_with_token", token=token))
         try:
             with use_conn() as conn, conn.cursor() as cur:
                 cur.execute(
