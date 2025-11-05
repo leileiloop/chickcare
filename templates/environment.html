@@ -1,213 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Environment | Chick Care</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .cardBox, .cardBox1 {
-            display: flex;
-            gap: 20px;
-            margin: 20px 0;
-        }
-        .card {
-            flex: 1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: #f5f5f5;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .numbers {
-            font-size: 2em;
-            font-weight: bold;
-        }
-        .iconBx img {
-            width: 50px;
-            height: 50px;
-        }
-        .charts {
-            margin: 30px 0;
-        }
-        .charts canvas {
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            padding: 10px;
-        }
-        .EnviTable {
-            margin: 30px 0;
-        }
-        .EnviTable table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .EnviTable th, .EnviTable td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: center;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environment | ChickCare</title>
+
+  <!-- ======= Styles ====== -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
+
 <body>
-<div class="container">
-    <!-- Navigation -->
+  <div class="container">
+    <!-- =============== Navigation ================ -->
     <div class="navigation">
-        <ul>
-            <li><a href="{{ url_for('dashboard') }}">
-                <span class="icon"><img src="{{ url_for('static', filename='imgs/CC.png') }}"></span>
-                <span class="title1">Chick Care</span></a></li>
-            <li><a href="{{ url_for('main_dashboard') }}"><span class="icon"><ion-icon name="reorder-four-outline"></ion-icon></span>Dashboard</a></li>
-            <li><a href="{{ url_for('webcam') }}"><span class="icon"><ion-icon name="stats-chart-outline"></ion-icon></span>Growth Tracking</a></li>
-            <li><a href="{{ url_for('feeding') }}"><span class="icon"><ion-icon name="layers-outline"></ion-icon></span>Supplies Stock</a></li>
-            <li><a href="{{ url_for('environment') }}"><span class="icon"><ion-icon name="cloudy-outline"></ion-icon></span>Environment</a></li>
-            <li><a href="{{ url_for('dashboard') }}"><span class="icon"><ion-icon name="notifications-circle-outline"></ion-icon></span>Notifications</a></li>
-            <li><a href="{{ url_for('sanitization') }}"><span class="icon"><ion-icon name="water-outline"></ion-icon></span>Sanitization</a></li>
-            {% if session.get('user_role') == 'admin' %}
-            <li><a href="{{ url_for('manage_users') }}"><span class="icon"><ion-icon name="people-outline"></ion-icon></span>Manage Users</a></li>
-            {% endif %}
-            <li><a href="{{ url_for('report') }}"><span class="icon"><ion-icon name="file-tray-stacked-outline"></ion-icon></span>Report</a></li>
-            <li><a href="{{ url_for('logout') }}"><span class="icon"><ion-icon name="log-out-outline"></ion-icon></span>Sign Out</a></li>
-        </ul>
+      <ul>
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
+            <span class="title">ChickCare</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('dashboard') }}">
+            <span class="icon"><i class='bx bxs-dashboard'></i></span>
+            <span class="title">Dashboard</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('growth_monitoring') }}">
+            <span class="icon"><i class='bx bxs-doughnut-chart'></i></span>
+            <span class="title">Growth Monitoring</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('data_table') }}">
+            <span class="icon"><i class='bx bx-table'></i></span>
+            <span class="title">Data Table</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('feeding_schedule') }}">
+            <span class="icon"><i class='bx bxs-bowl-rice'></i></span>
+            <span class="title">Feeding Schedule</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('environment') }}" class="active">
+            <span class="icon"><i class='bx bxs-thermometer'></i></span>
+            <span class="title">Environment</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('sanitization') }}">
+            <span class="icon"><i class='bx bxs-virus'></i></span>
+            <span class="title">Sanitization</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="{{ url_for('logout') }}">
+            <span class="icon"><i class='bx bx-log-out'></i></span>
+            <span class="title">Logout</span>
+          </a>
+        </li>
+      </ul>
     </div>
 
-    <!-- Main -->
+    <!-- ========================= Main ==================== -->
     <div class="main">
-        <!-- Topbar -->
-        <div class="topbar">
-            <div class="toggle"><ion-icon name="menu-outline"></ion-icon></div>
-            <div class="datetime"><span id="displayDateTime"></span></div>
-            <div class="iconn" onclick="toggleNotifi()">
-                <img src="{{ url_for('static', filename='imgs/bell.png') }}" alt="">
-                <span id="notificationCount">{{ notifications|length }}</span>
-            </div>
-            <div class="notifi-box" id="box">
-                <h2>Notifications <span>{{ notifications|length }}</span></h2>
-                <div class="notifi-item">
-                    <div class="text">
-                        {% for notif in notifications %}
-                            <p>{{ notif.DateTime }} - {{ notif.message }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            <div class="user"><img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt=""></div>
+      <div class="topbar">
+        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="search">
+          <label>
+            <input type="text" placeholder="Search here">
+            <i class='bx bx-search'></i>
+          </label>
         </div>
+        <div class="user">
+          <img src="{{ url_for('static', filename='img/user.jpg') }}" alt="User">
+        </div>
+      </div>
 
-        <!-- Environment Status Cards -->
-        <h1>Environment</h1>
-        <div class="cardBox">
-            <div class="card">
-                <div>
-                    <div id="hum" class="numbers">{{ environment.humidity }}%</div>
-                    <div class="cardName">Humidity</div>
-                </div>
-                <div class="iconBx"><img src="{{ url_for('static', filename='imgs/humidity.png') }}"></div>
-            </div>
-            <div class="card">
-                <div>
-                    <div id="temp" class="numbers">{{ environment.temperature }}°C</div>
-                    <div class="cardName">Temperature</div>
-                </div>
-                <div class="iconBx"><img src="{{ url_for('static', filename='imgs/temperature.png') }}"></div>
-            </div>
-            <div class="card">
-                <div>
-                    <div id="amm" class="numbers">{{ environment.ammonia }} ppm</div>
-                    <div class="cardName">Ammonia</div>
-                </div>
-                <div class="iconBx"><img src="{{ url_for('static', filename='imgs/ammonia.jpg') }}"></div>
-            </div>
-        </div>
+      <!-- ======================= Environment ================== -->
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>Environment Monitoring</h2>
+          </div>
 
-        <div class="cardBox1">
-            <div class="card">
-                <div>
-                    <div class="numbers" id="light1-status">{{ environment.light1_status }}</div>
-                    <div class="cardName">Light 1</div>
-                </div>
-                <div class="iconBx"><img id="light1" src="{{ url_for('static', filename='imgs/LightA.png') }}"></div>
-            </div>
-            <div class="card">
-                <div>
-                    <div class="numbers" id="light2-status">{{ environment.light2_status }}</div>
-                    <div class="cardName">Light 2</div>
-                </div>
-                <div class="iconBx"><img id="light2" src="{{ url_for('static', filename='imgs/LightA.png') }}"></div>
-            </div>
-            <div class="card">
-                <div>
-                    <div class="numbers" id="exhaustfan-status">{{ environment.exhaustfan_status }}</div>
-                    <div class="cardName">Exhaust Fan</div>
-                </div>
-                <div class="iconBx"><img id="exhaustfan" src="{{ url_for('static', filename='imgs/exhaust-fan.png') }}"></div>
-            </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Temperature (°C)</th>
+                <th>Humidity (%)</th>
+                <th>Date</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record in environment_data %}
+              <tr>
+                <td>{{ record.temperature }}</td>
+                <td>{{ record.humidity }}</td>
+                <td>{{ record.date }}</td>
+                <td>{{ record.time }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" style="text-align:center;">No environment data available</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-
-        <!-- Charts -->
-        <div class="charts">
-            <div class="chart">
-                <h2>Temperature</h2>
-                <canvas id="lineChart"></canvas>
-            </div>
-            <div class="chart">
-                <h2>Humidity</h2>
-                <canvas id="lineChart1"></canvas>
-            </div>
-        </div>
-
-        <!-- Environment Table -->
-        <div class="EnviTable">
-            <table id="table-body2">
-                <thead>
-                    <tr>
-                        <th>DateTime</th>
-                        <th>Humidity</th>
-                        <th>Temperature</th>
-                        <th>Light 1</th>
-                        <th>Light 2</th>
-                        <th>Ammonia</th>
-                        <th>Exhaust Fan</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for data in environment_logs %}
-                    <tr>
-                        <td>{{ data.datetime }}</td>
-                        <td>{{ data.humidity }}%</td>
-                        <td>{{ data.temperature }}°C</td>
-                        <td>{{ data.light1_status }}</td>
-                        <td>{{ data.light2_status }}</td>
-                        <td>{{ data.ammonia }} ppm</td>
-                        <td>{{ data.exhaustfan_status }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-
-<script>
-    // Toggle notifications
-    function toggleNotifi() {
-        const box = document.getElementById('box');
-        box.style.display = box.style.display === 'block' ? 'none' : 'block';
-    }
-
-    // Update DateTime
-    function updateDateTime() {
-        document.getElementById('displayDateTime').textContent = new Date().toLocaleString();
-    }
-    setInterval(updateDateTime, 1000);
-    updateDateTime();
-</script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
