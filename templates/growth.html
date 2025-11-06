@@ -193,8 +193,7 @@
 
             </div>
                 <script>
-
-                    var currentImageIndex = 0;
+                    // var currentImageIndex = 0;
                     var imageFiles = [];
                     var autoChangeInterval; // Variable to hold the interval ID
 
@@ -232,6 +231,9 @@
                         }
 
                         if (imageFiles.length > 0) {
+                            // This pathing assumes your 'shots' folder is inside your 'static' folder
+                            // e.g., /static/shots/image1.jpg
+                            // This code is correct, but it needs the server to send the file list.
                             document.getElementById('current-image-1').src = "{{ url_for('static', filename='shots/') }}" + imageFiles[currentImageIndex];
                             document.getElementById('current-image-2').src = "{{ url_for('static', filename='shots/') }}" + imageFiles[(currentImageIndex + 1) % imageFiles.length];
                             document.getElementById('current-image-3').src = "{{ url_for('static', filename='shots/') }}" + imageFiles[(currentImageIndex + 2) % imageFiles.length];
@@ -243,9 +245,6 @@
 
                     // Start automatic photo changing when the page loads
                     startAutoChange();
-
-                    // Uncomment the line below to stop automatic photo changing when the page loads
-                    // stopAutoChange();
 
                 </script>
 
@@ -266,7 +265,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    </tbody>
+                        </tbody>
                     </table>
             </div>
 
@@ -280,7 +279,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    </tbody>
+                        </tbody>
                     </table>
             </div>
 
