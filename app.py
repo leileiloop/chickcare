@@ -54,7 +54,8 @@ if ConnectionPool is None:
     pool = None
 else:
     try:
-        pool = ConnectionPool(conninfo=DB_URL, max_size=POOL_MAX)
+        # <-- FIX: Added row_factory=dict_row to the pool constructor
+        pool = ConnectionPool(conninfo=DB_URL, max_size=POOL_MAX, row_factory=dict_row)
         app.logger.info("Postgres connection pool created (max_size=%s).", POOL_MAX)
     except Exception:
         app.logger.exception("Failed to create Postgres connection pool; falling back to None.")
@@ -72,6 +73,7 @@ def get_conn():
     # fallback: provide a context manager that yields a direct connection
     class _DirectConnCtx:
         def __enter__(self):
+            # The fallback connection *already* had dict_row, which was correct
             self.conn = psycopg.connect(DB_URL, row_factory=dict_row)
             return self.conn
         def __exit__(self, exc_type, exc, tb):
@@ -200,6 +202,7 @@ def normalize_env_records(rows):
     out = []
     for r in rows:
         try:
+            # 'r' should now always be a dict-like row, but 'dict(r)' is safe
             rec = dict(r)
         except Exception:
             rec = r
@@ -241,7 +244,7 @@ def get_growth_chart_data(limit=20):
             rows = cur.fetchall()
             rows = list(reversed(rows))
             for r in rows:
-                rec = dict(r)
+                rec = dict(r) # 'r' is now a dict_row, but dict() is still safe
                 dt = rec.get("datetime")
                 if isinstance(dt, datetime.datetime):
                     label = dt.strftime("%Y-%m-%d %H:%M")
@@ -284,7 +287,7 @@ def get_user_by_email(email):
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
-            return cur.fetchone()
+            return cur.fetchone() # This will now be a dict_row or None
     except Exception:
         app.logger.exception("Error fetching user by email")
         return None
@@ -293,7 +296,7 @@ def get_user_by_id(user_id):
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-            return cur.fetchone()
+            return cur.fetchone() # This will now be a dict_row or None
     except Exception:
         app.logger.exception("Error fetching user by ID")
         return None
@@ -342,6 +345,8 @@ def login():
         email = request.form.get("email","").strip()
         password = request.form.get("password","")
         user = get_user_by_email(email)
+        
+        # 'user' is now a dict_row (or None), so user["password"] will work
         if user and check_password_hash(user["password"], password):
             session.update({
                 "user_id": user["id"],
@@ -411,6 +416,7 @@ def dashboard():
             try:
                 cur.execute("SELECT COUNT(*) AS total FROM chickens")
                 res = cur.fetchone()
+                # res["total"] will work now
                 total_chickens = int(res["total"]) if res and res.get("total") is not None else 0
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'chickens' does not exist.")
@@ -423,7 +429,7 @@ def dashboard():
                 cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
                 feed = cur.fetchone()
                 if feed and feed.get("feed_time"):
-                    ft = feed["feed_time"]
+                    ft = feed["feed_time"] # feed["feed_time"] will work now
                     if isinstance(ft, datetime.datetime):
                         upcoming_feeding = ft.strftime("%H:%M")
                     else:
@@ -459,7 +465,7 @@ def admin_dashboard():
             try:
                 cur.execute("SELECT COUNT(*) AS c FROM users")
                 r = cur.fetchone()
-                active_users = int(r["c"]) if r and r.get("c") is not None else 0
+                active_users = int(r["c"]) if r and r.get("c") is not None else 0 # r["c"] will work
             except Exception:
                 app.logger.debug("admin_dashboard: users count failed")
 
@@ -467,7 +473,7 @@ def admin_dashboard():
                 cur.execute("SELECT id, datetime FROM sensordata ORDER BY id DESC LIMIT 5")
                 rows = cur.fetchall()
                 for row in rows:
-                    rec = dict(row)
+                    rec = dict(row) # 'row' is a dict_row
                     dt = rec.get("datetime") or rec.get("timestamp") or ""
                     recent_activities.append({"user": "system", "action": "sensordata inserted", "date": str(dt)})
             except Exception:
@@ -476,11 +482,11 @@ def admin_dashboard():
         app.logger.exception("admin_dashboard: error")
 
     return render_template("admin-dashboard.html",
-                           active_users=active_users,
-                           reports_count=reports_count,
-                           active_farms=active_farms,
-                           alerts_count=alerts_count,
-                           recent_activities=recent_activities)
+                            active_users=active_users,
+                            reports_count=reports_count,
+                            active_farms=active_farms,
+                            alerts_count=alerts_count,
+                            recent_activities=recent_activities)
 
 @app.route("/profile")
 @login_required
@@ -606,7 +612,7 @@ def feed_schedule():
             cur.execute("SELECT id, feed_time, feed_type, amount FROM feeding_schedule ORDER BY feed_time ASC")
             raw = cur.fetchall()
             for r in raw:
-                rec = dict(r)
+                rec = dict(r) # 'r' is a dict_row
                 ft = rec.get("feed_time")
                 if isinstance(ft, datetime.datetime):
                     rec["time"] = ft.strftime("%Y-%m-%d %H:%M:%S")
