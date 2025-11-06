@@ -763,8 +763,8 @@ def fetch_all_data4():
 
 @app.route('/get_all_data5')
 @app.route('/get_environment_data') # <-- FIXED: Alias for Environment
-@app.route('/get_all_data')       # <-- FIXED: Alias for general data
-@app.route('/data')               # <-- FIXED: Alias for report data
+@app.route('/get_all_data')        # <-- FIXED: Alias for general data
+@app.route('/data')                # <-- FIXED: Alias for report data
 def fetch_all_data5():
     """Fetches Environment data from sensordata."""
     try:
@@ -803,6 +803,35 @@ def fetch_all_data7():
             return jsonify(results)
     except Exception as e:
         app.logger.exception("Error in /get_all_data7")
+        return jsonify({'error': str(e)}), 500
+
+# -----------------------------------------------
+# <-- ⭐️ FIX: Added missing route for growth.html image gallery
+# -----------------------------------------------
+@app.route("/get_image_list")
+@login_required 
+def get_image_list():
+    try:
+        # Assumes 'shots' is a folder inside your 'static' folder
+        image_dir = os.path.join(app.static_folder, 'shots')
+        
+        if not os.path.exists(image_dir):
+            app.logger.warning(f"Image directory not found: {image_dir}")
+            return jsonify([])
+
+        # Get all files and filter for common image extensions
+        all_files = os.listdir(image_dir)
+        image_files = [
+            f for f in all_files 
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))
+        ]
+        
+        # Sort them by name
+        image_files.sort() 
+        
+        return jsonify(image_files)
+    except Exception as e:
+        app.logger.exception("Error in /get_image_list")
         return jsonify({'error': str(e)}), 500
 
 # -------------------------
