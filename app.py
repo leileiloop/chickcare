@@ -1,5 +1,5 @@
-# app.py (rewritten, keeps all routes & logic; adds connection pooling & improved error handling)
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+# app.py (Combined Frontend/DB routes, uses Postgres Pool, AI/Hardware code removed)
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,7 +12,7 @@ import psycopg
 from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
 
-# connection pool from psycopg_pool (you included it in requirements)
+# connection pool from psycopg_pool
 try:
     from psycopg_pool import ConnectionPool
 except Exception:
@@ -54,7 +54,7 @@ if ConnectionPool is None:
     pool = None
 else:
     try:
-        # <-- FIX: Added row_factory=dict_row to the pool constructor
+        # ** FIX **: Added row_factory=dict_row to the pool
         pool = ConnectionPool(conninfo=DB_URL, max_size=POOL_MAX, row_factory=dict_row)
         app.logger.info("Postgres connection pool created (max_size=%s).", POOL_MAX)
     except Exception:
@@ -73,7 +73,6 @@ def get_conn():
     # fallback: provide a context manager that yields a direct connection
     class _DirectConnCtx:
         def __enter__(self):
-            # The fallback connection *already* had dict_row, which was correct
             self.conn = psycopg.connect(DB_URL, row_factory=dict_row)
             return self.conn
         def __exit__(self, exc_type, exc, tb):
@@ -102,7 +101,6 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 # Session security
 # -------------------------
-# Note: SESSION_COOKIE_SECURE=True requires HTTPS in production (Render provides HTTPS)
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -188,6 +186,22 @@ def init_tables():
                     weight FLOAT
                 )
             """)
+            # Added tables from Gist for data fetching
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chickstatus (
+                    id SERIAL PRIMARY KEY,
+                    ChickNumber VARCHAR(266),
+                    status VARCHAR(100),
+                    DateTime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id SERIAL PRIMARY KEY,
+                    message TEXT,
+                    DateTime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+                )
+            """)
     except Exception:
         app.logger.exception("init_tables: failed to ensure tables")
 
@@ -202,7 +216,6 @@ def normalize_env_records(rows):
     out = []
     for r in rows:
         try:
-            # 'r' should now always be a dict-like row, but 'dict(r)' is safe
             rec = dict(r)
         except Exception:
             rec = r
@@ -214,12 +227,15 @@ def normalize_env_records(rows):
             time_str = dt.strftime("%H:%M:%S")
         else:
             try:
+                # Try parsing as string if not datetime object
                 parsed = datetime.datetime.fromisoformat(str(dt))
                 date_str = parsed.strftime("%Y-%m-%d")
                 time_str = parsed.strftime("%H:%M:%S")
             except Exception:
                 date_str = str(dt) if dt is not None else ""
                 time_str = ""
+        
+        # Combine all possible keys
         record = {
             "temperature": rec.get("temperature") if rec.get("temperature") is not None else rec.get("temp"),
             "humidity": rec.get("humidity"),
@@ -229,7 +245,7 @@ def normalize_env_records(rows):
             "exhaustfan": rec.get("exhaustfan"),
             "date": date_str,
             "time": time_str,
-            **rec
+            **rec # Include all other fields from the row
         }
         out.append(record)
     return out
@@ -240,11 +256,12 @@ def get_growth_chart_data(limit=20):
     weights = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
+            # Use postgres-style %s placeholders
             cur.execute("SELECT datetime, weight FROM sensordata3 ORDER BY id DESC LIMIT %s", (limit,))
             rows = cur.fetchall()
             rows = list(reversed(rows))
             for r in rows:
-                rec = dict(r) # 'r' is now a dict_row, but dict() is still safe
+                rec = dict(r)
                 dt = rec.get("datetime")
                 if isinstance(dt, datetime.datetime):
                     label = dt.strftime("%Y-%m-%d %H:%M")
@@ -287,7 +304,7 @@ def get_user_by_email(email):
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email,))
-            return cur.fetchone() # This will now be a dict_row or None
+            return cur.fetchone()
     except Exception:
         app.logger.exception("Error fetching user by email")
         return None
@@ -296,7 +313,7 @@ def get_user_by_id(user_id):
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-            return cur.fetchone() # This will now be a dict_row or None
+            return cur.fetchone()
     except Exception:
         app.logger.exception("Error fetching user by ID")
         return None
@@ -324,7 +341,7 @@ def create_superadmin():
 create_superadmin()
 
 # -------------------------
-# Routes
+# Main Routes (Login, Dashboard, etc.)
 # -------------------------
 @app.route("/")
 def home():
@@ -346,7 +363,7 @@ def login():
         password = request.form.get("password","")
         user = get_user_by_email(email)
         
-        # 'user' is now a dict_row (or None), so user["password"] will work
+        # This works now because the pool uses dict_row
         if user and check_password_hash(user["password"], password):
             session.update({
                 "user_id": user["id"],
@@ -416,7 +433,6 @@ def dashboard():
             try:
                 cur.execute("SELECT COUNT(*) AS total FROM chickens")
                 res = cur.fetchone()
-                # res["total"] will work now
                 total_chickens = int(res["total"]) if res and res.get("total") is not None else 0
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'chickens' does not exist.")
@@ -429,7 +445,7 @@ def dashboard():
                 cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
                 feed = cur.fetchone()
                 if feed and feed.get("feed_time"):
-                    ft = feed["feed_time"] # feed["feed_time"] will work now
+                    ft = feed["feed_time"]
                     if isinstance(ft, datetime.datetime):
                         upcoming_feeding = ft.strftime("%H:%M")
                     else:
@@ -465,7 +481,7 @@ def admin_dashboard():
             try:
                 cur.execute("SELECT COUNT(*) AS c FROM users")
                 r = cur.fetchone()
-                active_users = int(r["c"]) if r and r.get("c") is not None else 0 # r["c"] will work
+                active_users = int(r["c"]) if r and r.get("c") is not None else 0
             except Exception:
                 app.logger.debug("admin_dashboard: users count failed")
 
@@ -473,7 +489,7 @@ def admin_dashboard():
                 cur.execute("SELECT id, datetime FROM sensordata ORDER BY id DESC LIMIT 5")
                 rows = cur.fetchall()
                 for row in rows:
-                    rec = dict(row) # 'row' is a dict_row
+                    rec = dict(row)
                     dt = rec.get("datetime") or rec.get("timestamp") or ""
                     recent_activities.append({"user": "system", "action": "sensordata inserted", "date": str(dt)})
             except Exception:
@@ -612,7 +628,7 @@ def feed_schedule():
             cur.execute("SELECT id, feed_time, feed_type, amount FROM feeding_schedule ORDER BY feed_time ASC")
             raw = cur.fetchall()
             for r in raw:
-                rec = dict(r) # 'r' is a dict_row
+                rec = dict(r)
                 ft = rec.get("feed_time")
                 if isinstance(ft, datetime.datetime):
                     rec["time"] = ft.strftime("%Y-%m-%d %H:%M:%S")
@@ -653,6 +669,116 @@ def sanitization():
 @login_required
 def report():
     return render_template("report.html")
+
+# -----------------------------------------------
+# Data Fetching API Routes (from Gist, converted to Postgres)
+# -----------------------------------------------
+
+def format_datetime_in_results(results, field_name="datetime"):
+    """Helper to format datetime fields in a list of dicts."""
+    for result in results:
+        if result.get(field_name):
+            try:
+                original_datetime = result[field_name]
+                if isinstance(original_datetime, datetime.datetime):
+                    formatted_datetime = original_datetime.strftime("%Y-%m-%d %I:%M:%S %p")
+                else:
+                    formatted_datetime = datetime.datetime.fromisoformat(str(original_datetime)).strftime("%Y-%m-%d %I:%M:%S %p")
+                result[field_name] = formatted_datetime
+            except Exception:
+                # Keep original string if parsing fails
+                result[field_name] = str(result[field_name])
+    return results
+
+@app.route('/get_all_data1')
+def fetch_all_data1():
+    """Fetches ChickNumber and Weight from sensordata3."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, ChickNumber, Weight FROM sensordata3 ORDER BY DateTime DESC LIMIT 10")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data1")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data2')
+def fetch_all_data2():
+    """Fetches Sanitization data from sensordata2."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT Conveyor, Sprinkle, UVLight FROM sensordata2 ORDER BY DateTime DESC LIMIT 1")
+            results = cur.fetchall()
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data2")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data3')
+def fetch_all_data3():
+    """Fetches Food/Water stock from sensordata1."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, Food, Water FROM sensordata1 ORDER BY DateTime DESC LIMIT 10")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data3")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data4')
+def fetch_all_data4():
+    """Fetches Water/Food Levels from sensordata4."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, Water_Level, Food_Level FROM sensordata4 ORDER BY DateTime DESC LIMIT 10")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data4")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data5')
+def fetch_all_data5():
+    """Fetches Environment data from sensordata."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, Humidity, Temperature, Ammonia, Light1, Light2, ExhaustFan FROM sensordata ORDER BY DateTime DESC LIMIT 10")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data5")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data6')
+def fetch_all_data6():
+    """Fetches Chick Health Status from chickstatus."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, ChickNumber, status FROM chickstatus ORDER BY DateTime DESC LIMIT 10")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data6")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_all_data7')
+def fetch_all_data7():
+    """Fetches Notifications."""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT DateTime, message FROM notifications ORDER BY DateTime DESC LIMIT 5")
+            results = cur.fetchall()
+            results = format_datetime_in_results(results, "datetime")
+            return jsonify(results)
+    except Exception as e:
+        app.logger.exception("Error in /get_all_data7")
+        return jsonify({'error': str(e)}), 500
 
 # -------------------------
 # Run App
