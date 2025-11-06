@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Feeding Schedule</title>
-<!-- ======= Styles ====== -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-    <!-- =============== Navigation ================ -->
     <div class="container">
         <div class="navigation">
             <ul>
@@ -75,7 +73,6 @@
                     </a>
                 </li>
 
-                <!-- Only show "Manage Users" if the logged-in user is an admin -->
                 {% if session['user_role'] == 'admin' %}
                 <li>
                     <a href="/manage_users">
@@ -97,17 +94,16 @@
                 </li>
 
                 <li>
-                    <a href="/login">
+                    <a href="{{ url_for('logout') }}">
                         <span class="icon">
-                           <a href="{{ url_for('logout') }}">>
+                            <ion-icon name="log-out-outline"></ion-icon>
                         </span>
                         <span class="title">Sign Out</span>
                     </a>
                 </li>
-            </ul>
+                </ul>
         </div>
 
-        <!-- ========================= Main ==================== -->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -119,20 +115,20 @@
                 </div>
 
 
-		        <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
-		        </div>
-		        <div class="notifi-box" id="box">
-			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
+                <div class="iconn" onclick="toggleNotifi()">
+                    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+                </div>
+                <div class="notifi-box" id="box">
+                    <h2>Notifications <span id="notificationCount1">0</span></h2>
+                <div class="notifi-item">
 
-				    <div class="text" id="notificationItems">
+                    <div class="text" id="notificationItems">
 
-			        </div>
-			    </div>
+                    </div>
+                </div>
 
 
-		        </div>
+                </div>
 
 
 
@@ -141,16 +137,15 @@
                 </div>
             </div>
 
-        <!-- ========================= Feeding Schedule ==================== -->
-            <div class="schedule">
+        <div class="schedule">
                 <h1>Supplies Stock</h1>
 
                 <div class="col-div-4-1">
-		            <div class="box-1">
-			        <div class="content-box-1">
-			        <p class="head-1">Water</p>
+                    <div class="box-1">
+                    <div class="content-box-1">
+                    <p class="head-1">Water</p>
 
-			        <div class="circle-wrap" id="water-gauge">
+                    <div class="circle-wrap" id="water-gauge">
                 <div class="circle">
                     <div class="mask full" id="water-fill">
                     <div class="fill"></div>
@@ -161,16 +156,16 @@
                     <div class="inside-circle" id="waterLevel"></div>
                         </div>
                     </div>
-		         </div>
-		            </div>
-	            </div>
+                    </div>
+                    </div>
+                </div>
 
                 <div class="col-div-4-1">
-		            <div class="box-1">
-			        <div class="content-box-1">
-			        <p class="head-1">Foods</p>
+                    <div class="box-1">
+                    <div class="content-box-1">
+                    <p class="head-1">Foods</p>
 
-			        <div class="circle-wrap-1">
+                    <div class="circle-wrap-1">
                 <div class="circle-1">
                     <div class="mask full-1">
                     <div class="fill-1"></div>
@@ -181,9 +176,9 @@
                     <div class="inside-circle-1" id="foodLevel"></div>
                         </div>
                     </div>
-		         </div>
-		            </div>
-	            </div>
+                    </div>
+                    </div>
+                </div>
 
 
                 <div class="stop-container1">
@@ -193,11 +188,10 @@
                     <div class="stop-box">
                         <button id="stopServoFood" class="stop-btn1">STOP</button>
                 </div>
-        </div>
+            </div>
 
             <div id="table-body3" class="tableSched">
-                 <!-- Table -->
-                <table class="meal-table">
+                    <table class="meal-table">
                     <thead>
                         <tr>
                             <th>DateTime</th>
@@ -217,10 +211,8 @@
 
 
 
-    <!-- =========== Scripts =========  -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <!-- ====== ionicons ======= -->
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 
