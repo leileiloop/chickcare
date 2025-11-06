@@ -48,7 +48,7 @@
           </a>
         </li>
         <li>
-          <a href="{{ url_for('feeding_schedule') }}">
+          <a href="{{ url_for('feed_schedule') }}">
             <span class="icon"><i class="bx bxs-time-five"></i></span>
             <span class="title">Feeding Schedule</span>
           </a>
@@ -86,7 +86,8 @@
           </label>
         </div>
         <div class="user">
-          <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User" />
+          <!-- If your static image path differs, adjust filename -->
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User" />
         </div>
       </div>
 
@@ -97,7 +98,44 @@
             <h2>Growth Progress</h2>
             <a href="{{ url_for('data_table') }}" class="btn">View Records</a>
           </div>
+
+          <!-- Chart canvas -->
           <canvas id="growthChart" width="100%" height="40"></canvas>
+
+          <!-- Data table below the chart -->
+          <div class="cardHeader" style="margin-top: 1.5rem;">
+            <h3>Recent Weighings</h3>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date / Time</th>
+                <th>Chick #</th>
+                <th>Weight (g)</th>
+                <th>Average (g)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if records %}
+                {% for r in records|reverse %}  {# show newest first #}
+                <tr>
+                  <td>{{ r.id }}</td>
+                  <td>{{ r.datetime }}</td>
+                  <td>{{ r.chicknumber }}</td>
+                  <td>{{ '%.3f'|format(r.weight) }}</td>
+                  <td>{{ r.averageweight if r.averageweight is not none else '-' }}</td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="5" style="text-align:center;">No weighing records found.</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+
         </div>
       </div>
     </div>
@@ -105,21 +143,24 @@
 
   <!-- Chart.js Script -->
   <script>
+    // Grab the data passed from Flask
+    const labels = {{ dates|tojson | safe }};
+    const dataPoints = {{ weights|tojson | safe }};
+
     const ctx = document.getElementById('growthChart').getContext('2d');
     const growthChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: {{ dates|tojson }},
+        labels: labels,
         datasets: [{
-          label: 'Weight (grams)',
-          data: {{ weights|tojson }},
+          label: 'Weight (g)',
+          data: dataPoints,
           fill: true,
-          borderColor: '#36a2eb',
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',
-          tension: 0.3,
+          borderColor: 'rgba(54,162,235,1)',
+          backgroundColor: 'rgba(54,162,235,0.12)',
+          tension: 0.25,
           borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: '#007bff'
+          pointRadius: 3
         }]
       },
       options: {
@@ -128,12 +169,11 @@
           legend: { display: true },
           title: {
             display: true,
-            text: 'Chicken Growth Over Time',
-            font: { size: 16, family: 'Poppins' }
+            text: 'Chicken Growth Over Time'
           }
         },
         scales: {
-          x: { title: { display: true, text: 'Date' } },
+          x: { title: { display: true, text: 'Date / Time' } },
           y: { title: { display: true, text: 'Weight (g)' } }
         }
       }
