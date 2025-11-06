@@ -15,6 +15,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   <div class="container">
     <!-- ================== Navigation ================= -->
     <div class="navigation">
@@ -57,9 +68,13 @@
       <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class="bx bx-menu"></i></div>
+
         <div class="title">Admin Control Panel</div>
+
         <div class="user">
-          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar" />
+          <!-- show username if available -->
+          <div class="username">{{ session.get('user_username', 'Admin') }}</div>
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar" onerror="this.style.display='none'"/>
         </div>
       </div>
 
@@ -67,7 +82,7 @@
       <div class="cardBox">
         <div class="card">
           <div>
-            <div class="numbers">{{ active_users }}</div>
+            <div class="numbers">{{ active_users | default(0) }}</div>
             <div class="cardName">Active Users</div>
           </div>
           <div class="iconBx"><i class="bx bx-user"></i></div>
@@ -75,7 +90,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ reports_count }}</div>
+            <div class="numbers">{{ reports_count | default(0) }}</div>
             <div class="cardName">Reports</div>
           </div>
           <div class="iconBx"><i class="bx bx-file"></i></div>
@@ -83,7 +98,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ active_farms }}</div>
+            <div class="numbers">{{ active_farms | default(0) }}</div>
             <div class="cardName">Active Farms</div>
           </div>
           <div class="iconBx"><i class="bx bx-home-smile"></i></div>
@@ -91,7 +106,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ alerts_count }}</div>
+            <div class="numbers">{{ alerts_count | default(0) }}</div>
             <div class="cardName">Alerts</div>
           </div>
           <div class="iconBx"><i class="bx bx-bell"></i></div>
@@ -136,15 +151,17 @@
 
   <!-- JS -->
   <script>
-    // Sidebar toggle
-    const toggle = document.querySelector('.toggle');
-    const navigation = document.querySelector('.navigation');
-    const main = document.querySelector('.main');
-
-    toggle.addEventListener('click', () => {
-      navigation.classList.toggle('active');
-      main.classList.toggle('active');
-    });
+    // Sidebar toggle (defensive)
+    (function(){
+      const toggle = document.querySelector('.toggle');
+      const navigation = document.querySelector('.navigation');
+      const main = document.querySelector('.main');
+      if (!toggle || !navigation || !main) return;
+      toggle.addEventListener('click', () => {
+        navigation.classList.toggle('active');
+        main.classList.toggle('active');
+      });
+    })();
   </script>
 </body>
 </html>
