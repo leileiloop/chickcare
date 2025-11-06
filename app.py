@@ -498,11 +498,11 @@ def admin_dashboard():
         app.logger.exception("admin_dashboard: error")
 
     return render_template("admin-dashboard.html",
-                            active_users=active_users,
-                            reports_count=reports_count,
-                            active_farms=active_farms,
-                            alerts_count=alerts_count,
-                            recent_activities=recent_activities)
+                           active_users=active_users,
+                           reports_count=reports_count,
+                           active_farms=active_farms,
+                           alerts_count=alerts_count,
+                           recent_activities=recent_activities)
 
 @app.route("/profile")
 @login_required
@@ -673,6 +673,13 @@ def report():
 # -----------------------------------------------
 # Data Fetching API Routes (from Gist, converted to Postgres)
 # -----------------------------------------------
+#
+# *** FIX APPLIED ***
+# Added the "friendly" route aliases (e.g., /get_growth_data) that
+# the frontend is requesting (seen in the 404 logs) to point to
+# your existing data functions.
+#
+# -----------------------------------------------
 
 def format_datetime_in_results(results, field_name="datetime"):
     """Helper to format datetime fields in a list of dicts."""
@@ -691,6 +698,7 @@ def format_datetime_in_results(results, field_name="datetime"):
     return results
 
 @app.route('/get_all_data1')
+@app.route('/get_growth_data') # <-- FIXED: Alias for Growth Monitoring
 def fetch_all_data1():
     """Fetches ChickNumber and Weight from sensordata3."""
     try:
@@ -704,6 +712,7 @@ def fetch_all_data1():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_all_data2')
+@app.route('/get_sanitization_data') # <-- FIXED: Alias for Sanitization
 def fetch_all_data2():
     """Fetches Sanitization data from sensordata2."""
     try:
@@ -729,6 +738,7 @@ def fetch_all_data3():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_all_data4')
+@app.route('/get_supplies_data') # <-- FIXED: Alias for Supplies Level
 def fetch_all_data4():
     """Fetches Water/Food Levels from sensordata4."""
     try:
@@ -742,6 +752,9 @@ def fetch_all_data4():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_all_data5')
+@app.route('/get_environment_data') # <-- FIXED: Alias for Environment
+@app.route('/get_all_data')         # <-- FIXED: Alias for general data
+@app.route('/data')                 # <-- FIXED: Alias for report data
 def fetch_all_data5():
     """Fetches Environment data from sensordata."""
     try:
@@ -755,6 +768,7 @@ def fetch_all_data5():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_all_data6')
+@app.route('/get_chickstatus_data') # <-- FIXED: Alias for Chick Status
 def fetch_all_data6():
     """Fetches Chick Health Status from chickstatus."""
     try:
@@ -768,6 +782,7 @@ def fetch_all_data6():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/get_all_data7')
+@app.route('/get_notifications_data') # <-- FIXED: Alias for Notifications
 def fetch_all_data7():
     """Fetches Notifications."""
     try:
