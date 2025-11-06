@@ -214,20 +214,32 @@ def dashboard():
 
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
-            records = cur.fetchall()
+            # Recent sensor data
+            try:
+                cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
+                records = cur.fetchall()
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'sensordata' does not exist.")
 
-            cur.execute("SELECT COUNT(*) AS total FROM chickens")
-            total_chickens = cur.fetchone()["total"]
+            # Total chickens
+            try:
+                cur.execute("SELECT COUNT(*) AS total FROM chickens")
+                total_chickens = cur.fetchone()["total"]
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'chickens' does not exist.")
 
             if records:
-                temperature = records[0]["temperature"]
-                humidity = records[0]["humidity"]
+                temperature = records[0].get("temperature", 0)
+                humidity = records[0].get("humidity", 0)
 
-            cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
-            feed = cur.fetchone()
-            if feed:
-                upcoming_feeding = feed["feed_time"].strftime("%H:%M")
+            # Upcoming feeding
+            try:
+                cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
+                feed = cur.fetchone()
+                if feed:
+                    upcoming_feeding = feed["feed_time"].strftime("%H:%M")
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'feeding_schedule' does not exist.")
     except Exception:
         app.logger.exception("Failed to fetch dashboard data")
         flash("Could not load dashboard data.", "warning")
@@ -365,8 +377,11 @@ def environment():
     environment_data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
-            environment_data = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
+                environment_data = cur.fetchall()
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
         app.logger.exception("Failed to load environment data")
         flash("Could not load environment data.", "warning")
@@ -378,8 +393,11 @@ def feed_schedule():
     feeding_schedule = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM feeding_schedule ORDER BY feed_time ASC")
-            feeding_schedule = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM feeding_schedule ORDER BY feed_time ASC")
+                feeding_schedule = cur.fetchall()
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'feeding_schedule' does not exist.")
     except Exception:
         app.logger.exception("Failed to load feeding data")
         flash("Could not load feeding data.", "warning")
@@ -401,8 +419,11 @@ def data_table():
     data_table_records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
-            data_table_records = cur.fetchall()
+            try:
+                cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
+                data_table_records = cur.fetchall()
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
         app.logger.exception("Failed to fetch data table")
         flash("Could not load data.", "warning")
