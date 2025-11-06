@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Notifications</title>
-    <!-- ======= Styles ====== -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-    <!-- =============== Navigation ================ -->
     <div class="container">
         <div class="navigation">
             <ul>
@@ -75,7 +73,6 @@
                     </a>
                 </li>
 
-                <!-- Only show "Manage Users" if the logged-in user is an admin -->
                 {% if session['user_role'] == 'admin' %}
                 <li>
                     <a href="/manage_users">
@@ -97,7 +94,7 @@
                 </li>
 
                 <li>
-                    <a href="/login">
+                    <a href="{{ url_for('logout') }}">
                         <span class="icon">
                             <ion-icon name="log-out-outline"></ion-icon>
                         </span>
@@ -107,7 +104,6 @@
             </ul>
         </div>
 
-        <!-- ========================= Main ==================== -->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -118,20 +114,20 @@
                     <span id="displayDateTime"></span>
                 </div>
 
-		       <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
-		        </div>
-		        <div class="notifi-box" id="box">
-			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
+                <div class="iconn" onclick="toggleNotifi()">
+                    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+                </div>
+                <div class="notifi-box" id="box">
+                    <h2>Notifications <span id="notificationCount1">0</span></h2>
+                    <div class="notifi-item">
 
-				    <div class="text" id="notificationItems">
+                        <div class="text" id="notificationItems">
 
-			        </div>
-			    </div>
+                        </div>
+                    </div>
 
 
-		        </div>
+                </div>
 
 
 
@@ -141,16 +137,12 @@
             </div>
 
 
-    <!-- ========================= Main ==================== -->
-
     <div class="dashboard-container">
     <header>
       <h1>Chick Care Overview</h1>
     </header>
 
-    <!-- Summary Grid: Growth Tracking, Supplies Stock, Environment -->
     <div class="summary-grid">
-      <!-- Growth Tracking Card -->
       <div class="card">
         <div class="card-header">
           <ion-icon name="stats-chart-outline"></ion-icon>
@@ -169,7 +161,6 @@
         <button class="view-btn" onclick="location.href='/webcam'">View Growth Tab</button>
       </div>
 
-      <!-- Supplies Stock Card -->
       <div class="card">
         <div class="card-header">
           <ion-icon name="layers-outline"></ion-icon>
@@ -185,7 +176,6 @@
         <button class="view-btn" onclick="location.href='/feeding'">View Supplies</button>
       </div>
 
-      <!-- Environment Card -->
       <div class="card">
         <div class="card-header">
           <ion-icon name="cloudy-outline"></ion-icon>
@@ -203,9 +193,7 @@
       </div>
     </div>
 
-    <!-- Secondary Grid: Notifications and Sanitization -->
     <div class="secondary-grid">
-      <!-- Notifications Card -->
       <div class="card notifications">
     <div class="card-header">
         <ion-icon name="notifications-circle-outline"></ion-icon>
@@ -213,13 +201,11 @@
     </div>
     <div class="card-content">
         <ul id="notification-list">
-            <!-- Notifications will be dynamically inserted here -->
-        </ul>
+            </ul>
     </div>
     <button class="view-btn" onclick="location.href='/dashboard'">View All Notifications</button>
     </div>
 
-      <!-- Sanitization Card -->
       <div class="card sanitization">
         <div class="card-header">
           <ion-icon name="water-outline"></ion-icon>
@@ -240,10 +226,8 @@
 </div>
     </div>
 
-    <!-- ====== ionicons ======= -->
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-    <!-- =========== Scripts =========  -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
 
