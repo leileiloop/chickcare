@@ -8,6 +8,7 @@ import logging
 import psycopg
 from psycopg.rows import dict_row
 import psycopg.errors as pg_errors
+import datetime
 
 # -------------------------
 # Flask App Setup
@@ -16,7 +17,7 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO)
 
 # -------------------------
-# Environment Variables
+# Environment Variables (required)
 # -------------------------
 required_env = ["SECRET_KEY", "DATABASE_URL", "MAIL_USERNAME", "SMTP_PASSWORD"]
 missing_env = [v for v in required_env if v not in os.environ]
@@ -28,7 +29,7 @@ DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
 
-# Fix Postgres URL for psycopg
+# Fix Postgres URL for psycopg if needed
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
 
 # -------------------------
@@ -47,6 +48,7 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 # Session Security
 # -------------------------
+# Note: SESSION_COOKIE_SECURE=True requires HTTPS; keep as you had it.
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -57,57 +59,159 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
+    """Return a psycopg connection with dict row factory"""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
-# Auto Table Creation
+# Auto Table Creation (safe, will not drop existing)
 # -------------------------
 def init_tables():
-    """Create required tables if they don't exist"""
+    """Create lightweight fallback tables if they do not exist.
+    This helps avoid runtime failures when a table is missing on a fresh DB.
+    It intentionally matches/overlaps the table names your templates and routes expect.
+    """
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Users table
+            # users table (matches your usage)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
-                    username VARCHAR(100) NOT NULL,
-                    email VARCHAR(150) UNIQUE NOT NULL,
-                    password VARCHAR(200) NOT NULL,
-                    role VARCHAR(50) DEFAULT 'user'
+                    username VARCHAR(266) NOT NULL,
+                    email VARCHAR(266) UNIQUE NOT NULL,
+                    password VARCHAR(266) NOT NULL,
+                    role TEXT DEFAULT 'user',
+                    reset_token TEXT
                 )
             """)
-            # Sensor data table
+            # sensordata (environment) - some schemas use 'datetime', others 'timestamp'
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sensordata (
                     id SERIAL PRIMARY KEY,
-                    temperature FLOAT,
-                    humidity FLOAT,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                    humidity REAL,
+                    temperature REAL,
+                    ammonia REAL,
+                    light1 VARCHAR(266),
+                    light2 VARCHAR(266),
+                    exhaustfan VARCHAR(266)
                 )
             """)
-            # Chickens table
+            # sensordata1..4 (kept minimal so your routes that query them don't crash)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sensordata1 (
+                    id SERIAL PRIMARY KEY,
+                    datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                    food VARCHAR(266),
+                    water VARCHAR(266)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sensordata2 (
+                    id SERIAL PRIMARY KEY,
+                    datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                    conveyor VARCHAR(266),
+                    sprinkle VARCHAR(266),
+                    uvlight VARCHAR(266)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sensordata3 (
+                    id SERIAL PRIMARY KEY,
+                    datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                    chicknumber VARCHAR(266),
+                    weight REAL,
+                    weighingcount INTEGER DEFAULT 0,
+                    averageweight DECIMAL(8,3) DEFAULT 0.000
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sensordata4 (
+                    id SERIAL PRIMARY KEY,
+                    water_level REAL,
+                    food_level REAL,
+                    datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+                )
+            """)
+            # feeding_schedule (some templates/queries expect this)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS feeding_schedule (
+                    id SERIAL PRIMARY KEY,
+                    feed_time TIMESTAMP WITHOUT TIME ZONE,
+                    feed_type VARCHAR(266),
+                    amount FLOAT
+                )
+            """)
+            # chickens (some dashboard queries expect chickens)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chickens (
                     id SERIAL PRIMARY KEY,
                     name VARCHAR(100),
-                    age INT,
+                    age INTEGER,
                     weight FLOAT
                 )
             """)
-            # Feeding schedule table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS feeding_schedule (
-                    id SERIAL PRIMARY KEY,
-                    feed_time TIMESTAMP,
-                    amount FLOAT
-                )
-            """)
             conn.commit()
-        app.logger.info("All tables ensured.")
+        app.logger.info("init_tables: ensured fallback tables exist.")
     except Exception:
-        app.logger.exception("Failed to initialize tables")
+        app.logger.exception("init_tables: failed to ensure tables")
 
+# Initialize fallback tables (safe)
 init_tables()
+
+# -------------------------
+# Short helpers
+# -------------------------
+def normalize_env_records(rows):
+    """Normalize returned rows to have keys used by your templates:
+       - temperature, humidity, date, time
+       Accepts dict_row or list of dict-like objects and returns list of dicts.
+    """
+    normalized = []
+    for r in rows:
+        # r may be a dict_row with keys like 'datetime' or 'timestamp'
+        try:
+            # convert to a plain dict in case it's a psycopg dict_row
+            rec = dict(r)
+        except Exception:
+            rec = r
+
+        # find a datetime value
+        dt = None
+        if "datetime" in rec and rec["datetime"] is not None:
+            dt = rec["datetime"]
+        elif "timestamp" in rec and rec["timestamp"] is not None:
+            dt = rec["timestamp"]
+        elif "date" in rec and rec["date"] is not None and isinstance(rec["date"], datetime.datetime):
+            dt = rec["date"]
+
+        date_str = ""
+        time_str = ""
+        if isinstance(dt, datetime.datetime):
+            date_str = dt.strftime("%Y-%m-%d")
+            time_str = dt.strftime("%H:%M:%S")
+        else:
+            # fallback: attempt to coerce strings
+            try:
+                parsed = datetime.datetime.fromisoformat(str(dt))
+                date_str = parsed.strftime("%Y-%m-%d")
+                time_str = parsed.strftime("%H:%M:%S")
+            except Exception:
+                date_str = str(rec.get("datetime") or rec.get("timestamp") or "")
+                time_str = ""
+
+        normalized.append({
+            "temperature": rec.get("temperature") if rec.get("temperature") is not None else rec.get("temp"),
+            "humidity": rec.get("humidity"),
+            "ammonia": rec.get("ammonia"),
+            "light1": rec.get("light1"),
+            "light2": rec.get("light2"),
+            "exhaustfan": rec.get("exhaustfan"),
+            "date": date_str,
+            "time": time_str,
+            # also keep raw record in case templates expect other fields
+            **rec
+        })
+    return normalized
 
 # -------------------------
 # Decorators
@@ -165,7 +269,7 @@ def create_superadmin():
     super_pass = generate_password_hash("admin")
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE role='superadmin'")
+            cur.execute("SELECT * FROM users WHERE role='superadmin' LIMIT 1")
             if not cur.fetchone():
                 cur.execute(
                     "INSERT INTO users (username,email,password,role) VALUES (%s,%s,%s,%s)",
@@ -178,6 +282,7 @@ def create_superadmin():
     except Exception:
         app.logger.exception("Failed to create superadmin")
 
+# Create once (safe if already exists)
 create_superadmin()
 
 # -------------------------
@@ -192,6 +297,7 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
+# ----- Auth -----
 @app.route("/login", methods=["GET","POST"])
 def login():
     if "user_id" in session:
@@ -254,30 +360,52 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    records, total_chickens, temperature, humidity, upcoming_feeding = [], 0, 0, 0, "N/A"
+    records = []
+    total_chickens = 0
+    temperature = 0
+    humidity = 0
+    upcoming_feeding = "N/A"
+
     try:
         with get_conn() as conn, conn.cursor() as cur:
+            # Fetch recent environment rows (if table exists)
             try:
                 cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
-                records = cur.fetchall()
+                raw = cur.fetchall()
+                # normalize for templates (date/time keys)
+                records = normalize_env_records(raw)
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'sensordata' does not exist.")
 
+            # Total chickens (if table exists)
             try:
                 cur.execute("SELECT COUNT(*) AS total FROM chickens")
-                total_chickens = cur.fetchone()["total"]
+                res = cur.fetchone()
+                total_chickens = int(res["total"]) if res and res.get("total") is not None else 0
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'chickens' does not exist.")
 
+            # Use most recent record for temperature/humidity if available
             if records:
-                temperature = records[0].get("temperature", 0)
-                humidity = records[0].get("humidity", 0)
+                temperature = records[0].get("temperature", 0) or 0
+                humidity = records[0].get("humidity", 0) or 0
 
+            # Next feeding (if table exists)
             try:
                 cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
                 feed = cur.fetchone()
-                if feed:
-                    upcoming_feeding = feed["feed_time"].strftime("%H:%M")
+                if feed and feed.get("feed_time"):
+                    # feed_time may be datetime object
+                    ft = feed["feed_time"]
+                    if isinstance(ft, datetime.datetime):
+                        upcoming_feeding = ft.strftime("%H:%M")
+                    else:
+                        # try parse
+                        try:
+                            parsed = datetime.datetime.fromisoformat(str(ft))
+                            upcoming_feeding = parsed.strftime("%H:%M")
+                        except Exception:
+                            upcoming_feeding = str(ft)
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'feeding_schedule' does not exist.")
     except Exception:
@@ -296,7 +424,38 @@ def dashboard():
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
 def admin_dashboard():
-    return render_template("admin-dashboard.html")
+    # Example admin metrics - try to load simple counts where possible
+    active_users = 0
+    reports_count = 0
+    active_farms = 0
+    alerts_count = 0
+    recent_activities = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            try:
+                cur.execute("SELECT COUNT(*) AS c FROM users")
+                r = cur.fetchone()
+                active_users = int(r["c"]) if r and r.get("c") is not None else 0
+            except Exception:
+                app.logger.debug("admin_dashboard: users count failed")
+            # recent activity fallback: use sensordata or sensordata1 timestamps to show some activity
+            try:
+                cur.execute("SELECT id, datetime FROM sensordata ORDER BY id DESC LIMIT 5")
+                rows = cur.fetchall()
+                for row in rows:
+                    dt = row.get("datetime") or row.get("timestamp") or ""
+                    recent_activities.append({"user":"system","action":"sensordata inserted","date": str(dt)})
+            except Exception:
+                app.logger.debug("admin_dashboard: recent activities fetch failed")
+    except Exception:
+        app.logger.exception("admin_dashboard: error")
+
+    return render_template("admin-dashboard.html",
+                           active_users=active_users,
+                           reports_count=reports_count,
+                           active_farms=active_farms,
+                           alerts_count=alerts_count,
+                           recent_activities=recent_activities)
 
 # ----- Profile & Settings -----
 @app.route("/profile")
@@ -409,7 +568,47 @@ def reset_with_token(token):
 @app.route("/growth-monitoring")
 @login_required
 def growth_monitoring():
+    # Some older templates used url_for('feeding_schedule') (BuildError). Provide alias route below.
     return render_template("growth.html")
+
+# --- Alias for older templates that reference feeding_schedule endpoint name ---
+@app.route("/feeding_schedule")
+def feeding_schedule_alias():
+    """
+    Some templates (older) call url_for('feeding_schedule') — this alias keeps backward compatibility.
+    It delegates to the current feed_schedule view.
+    """
+    return feed_schedule()
+
+# Keep your original feed-schedule route (templates use 'feed_schedule')
+@app.route("/feed-schedule")
+@login_required
+def feed_schedule():
+    feeding_schedule = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            try:
+                cur.execute("SELECT id, feed_time, feed_type, amount FROM feeding_schedule ORDER BY feed_time ASC")
+                raw = cur.fetchall()
+                # normalize feed_time to readable strings for templates
+                feeding_schedule = []
+                for r in raw:
+                    rec = dict(r)
+                    ft = rec.get("feed_time")
+                    if isinstance(ft, datetime.datetime):
+                        rec["time"] = ft.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        rec["time"] = str(ft)
+                    # compatibility with templates expecting .time, .feed_type, .amount
+                    rec["feed_type"] = rec.get("feed_type") or rec.get("type") or ""
+                    rec["amount"] = rec.get("amount") or 0
+                    feeding_schedule.append(rec)
+            except psycopg.errors.UndefinedTable:
+                app.logger.warning("Table 'feeding_schedule' does not exist.")
+    except Exception:
+        app.logger.exception("Failed to load feeding data")
+        flash("Could not load feeding data.", "warning")
+    return render_template("feeding.html", feeding_schedule=feeding_schedule)
 
 @app.route("/environment")
 @login_required
@@ -418,30 +617,15 @@ def environment():
     try:
         with get_conn() as conn, conn.cursor() as cur:
             try:
-                cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
-                environment_data = cur.fetchall()
+                cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 50")
+                raw = cur.fetchall()
+                environment_data = normalize_env_records(raw)
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
         app.logger.exception("Failed to load environment data")
         flash("Could not load environment data.", "warning")
     return render_template("environment.html", environment_data=environment_data)
-
-@app.route("/feed-schedule")
-@login_required
-def feed_schedule():
-    feeding_schedule = []
-    try:
-        with get_conn() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("SELECT * FROM feeding_schedule ORDER BY feed_time ASC")
-                feeding_schedule = cur.fetchall()
-            except psycopg.errors.UndefinedTable:
-                app.logger.warning("Table 'feeding_schedule' does not exist.")
-    except Exception:
-        app.logger.exception("Failed to load feeding data")
-        flash("Could not load feeding data.", "warning")
-    return render_template("feeding.html", feeding_schedule=feeding_schedule)
 
 @app.route("/sanitization")
 @login_required
@@ -461,7 +645,8 @@ def data_table():
         with get_conn() as conn, conn.cursor() as cur:
             try:
                 cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
-                data_table_records = cur.fetchall()
+                raw = cur.fetchall()
+                data_table_records = normalize_env_records(raw)
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
@@ -473,4 +658,5 @@ def data_table():
 # Run App
 # -------------------------
 if __name__ == "__main__":
+    # Keep debug True for now (as in your original), but set to False in production if you want.
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
