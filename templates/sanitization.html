@@ -1,44 +1,4 @@
-<script>
-                            // 1. Select the elements we need to work with
-                            const statusElement = document.getElementById('uvc_status');
-                            const imageElement = document.getElementById('uvcImage');
-                        
-                            // 2. Define the function that updates the image
-                            function updateUvcImage() {
-                                // Get the text and trim whitespace
-                                const status = statusElement.innerText.trim(); 
-                                
-                                if (status === 'ON') {
-                                    imageElement.src = '{{ url_for("static", filename="imgs/UVCon.png") }}';
-                                } else {
-                                    // Default to OFF for 'OFF', empty, or any other state
-                                    imageElement.src = '{{ url_for("static", filename="imgs/UVCoff.png") }}';
-                                }
-                            }
-                        
-                            // 3. Create an observer to watch for changes
-                            // This will run our function *every time* main.js updates the status
-                            const observer = new MutationObserver(function(mutations) {
-                                updateUvcImage();
-                            });
-                        
-                            // 4. Tell the observer to watch the status element for text changes
-                            observer.observe(statusElement, {
-                                childList: true, // This watches for changes to the text inside
-                            });
-                        
-                            // 5. Run the function once on page load just in case
-                            updateUvcImage();
-                        </script>
-                        ```
 
----
-
-### ✨ Full Corrected Code
-
-Here is the complete HTML file with the JavaScript fix applied.
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -291,3 +251,4 @@ Here is the complete HTML file with the JavaScript fix applied.
             <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
 </html>
+
