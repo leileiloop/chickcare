@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
@@ -24,10 +25,14 @@ missing_env = [v for v in required_env if v not in os.environ]
 if missing_env:
     raise RuntimeError(f"Missing required environment variables: {', '.join(missing_env)}")
 
+# load env
 app.secret_key = os.environ["SECRET_KEY"]
 DB_URL_RAW = os.environ["DATABASE_URL"]
 MAIL_USERNAME = os.environ["MAIL_USERNAME"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
+
+# Allow an optional DEBUG env var (for local testing)
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
 
 # Fix Postgres URL for psycopg if needed
 DB_URL = DB_URL_RAW.replace("postgres://", "postgresql://", 1) if DB_URL_RAW.startswith("postgres://") else DB_URL_RAW
@@ -48,7 +53,7 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 # -------------------------
 # Session Security
 # -------------------------
-# Note: SESSION_COOKIE_SECURE=True requires HTTPS; keep as you had it.
+# On Render your site will be HTTPS. Keep these for production.
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -59,20 +64,18 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
-    """Return a psycopg connection with dict row factory"""
+    """Return a psycopg connection with dict row factory."""
     return psycopg.connect(DB_URL, row_factory=dict_row)
 
 # -------------------------
-# Auto Table Creation (safe, will not drop existing)
+# Auto Table Creation (safe)
 # -------------------------
 def init_tables():
-    """Create lightweight fallback tables if they do not exist.
-    This helps avoid runtime failures when a table is missing on a fresh DB.
-    It intentionally matches/overlaps the table names your templates and routes expect.
+    """Create minimal fallback tables to prevent runtime crashes on fresh DBs.
+       This is intentionally conservative: it will NOT drop or modify existing tables.
     """
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # users table (matches your usage)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -83,7 +86,6 @@ def init_tables():
                     reset_token TEXT
                 )
             """)
-            # sensordata (environment) - some schemas use 'datetime', others 'timestamp'
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sensordata (
                     id SERIAL PRIMARY KEY,
@@ -96,7 +98,6 @@ def init_tables():
                     exhaustfan VARCHAR(266)
                 )
             """)
-            # sensordata1..4 (kept minimal so your routes that query them don't crash)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS sensordata1 (
                     id SERIAL PRIMARY KEY,
@@ -132,7 +133,6 @@ def init_tables():
                     datetime TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
                 )
             """)
-            # feeding_schedule (some templates/queries expect this)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS feeding_schedule (
                     id SERIAL PRIMARY KEY,
@@ -141,7 +141,6 @@ def init_tables():
                     amount FLOAT
                 )
             """)
-            # chickens (some dashboard queries expect chickens)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS chickens (
                     id SERIAL PRIMARY KEY,
@@ -155,51 +154,40 @@ def init_tables():
     except Exception:
         app.logger.exception("init_tables: failed to ensure tables")
 
-# Initialize fallback tables (safe)
+# Run it once at startup (safe)
 init_tables()
 
 # -------------------------
-# Short helpers
+# Utilities
 # -------------------------
 def normalize_env_records(rows):
-    """Normalize returned rows to have keys used by your templates:
-       - temperature, humidity, date, time
-       Accepts dict_row or list of dict-like objects and returns list of dicts.
+    """Normalize sensor/weight rows into dicts the templates expect:
+       - fields: temperature, humidity, ammonia, light1, light2, exhaustfan, date, time
+       Accepts psycopg dict_row list or plain dicts.
     """
-    normalized = []
+    out = []
     for r in rows:
-        # r may be a dict_row with keys like 'datetime' or 'timestamp'
         try:
-            # convert to a plain dict in case it's a psycopg dict_row
             rec = dict(r)
         except Exception:
             rec = r
-
-        # find a datetime value
-        dt = None
-        if "datetime" in rec and rec["datetime"] is not None:
-            dt = rec["datetime"]
-        elif "timestamp" in rec and rec["timestamp"] is not None:
-            dt = rec["timestamp"]
-        elif "date" in rec and rec["date"] is not None and isinstance(rec["date"], datetime.datetime):
-            dt = rec["date"]
-
+        # find datetime-like field
+        dt = rec.get("datetime") or rec.get("timestamp") or rec.get("date")
         date_str = ""
         time_str = ""
         if isinstance(dt, datetime.datetime):
             date_str = dt.strftime("%Y-%m-%d")
             time_str = dt.strftime("%H:%M:%S")
         else:
-            # fallback: attempt to coerce strings
+            # try parse iso
             try:
                 parsed = datetime.datetime.fromisoformat(str(dt))
                 date_str = parsed.strftime("%Y-%m-%d")
                 time_str = parsed.strftime("%H:%M:%S")
             except Exception:
-                date_str = str(rec.get("datetime") or rec.get("timestamp") or "")
+                date_str = str(dt) if dt is not None else ""
                 time_str = ""
-
-        normalized.append({
+        record = {
             "temperature": rec.get("temperature") if rec.get("temperature") is not None else rec.get("temp"),
             "humidity": rec.get("humidity"),
             "ammonia": rec.get("ammonia"),
@@ -208,13 +196,37 @@ def normalize_env_records(rows):
             "exhaustfan": rec.get("exhaustfan"),
             "date": date_str,
             "time": time_str,
-            # also keep raw record in case templates expect other fields
             **rec
-        })
-    return normalized
+        }
+        out.append(record)
+    return out
+
+def get_growth_chart_data(limit=20):
+    """Return dates and weights from sensordata3 for the growth chart."""
+    dates = []
+    weights = []
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT datetime, weight FROM sensordata3 ORDER BY id DESC LIMIT %s", (limit,))
+            rows = cur.fetchall()
+            # rows are newest-first; reverse to show oldest->newest
+            rows = list(reversed(rows))
+            for r in rows:
+                rec = dict(r)
+                dt = rec.get("datetime")
+                label = ""
+                if isinstance(dt, datetime.datetime):
+                    label = dt.strftime("%Y-%m-%d %H:%M")
+                else:
+                    label = str(dt)
+                dates.append(label)
+                weights.append(rec.get("weight") or 0)
+    except Exception:
+        app.logger.exception("get_growth_chart_data failed")
+    return dates, weights
 
 # -------------------------
-# Decorators
+# Decorators (same as before)
 # -------------------------
 def login_required(f):
     @wraps(f)
@@ -238,7 +250,7 @@ def role_required(*roles):
     return decorator
 
 # -------------------------
-# User Helpers
+# User helpers (unchanged semantics)
 # -------------------------
 def get_user_by_email(email):
     try:
@@ -263,7 +275,7 @@ def get_current_user():
     return get_user_by_id(user_id) if user_id else None
 
 def create_superadmin():
-    """Create default superadmin if none exists"""
+    """Create default superadmin if none exists (safe)."""
     super_email = "superadmin@example.com"
     super_username = "admin"
     super_pass = generate_password_hash("admin")
@@ -282,11 +294,11 @@ def create_superadmin():
     except Exception:
         app.logger.exception("Failed to create superadmin")
 
-# Create once (safe if already exists)
+# Ensure one superadmin exists
 create_superadmin()
 
 # -------------------------
-# Routes
+# Routes (auth + pages)
 # -------------------------
 @app.route("/")
 def home():
@@ -297,7 +309,6 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# ----- Auth -----
 @app.route("/login", methods=["GET","POST"])
 def login():
     if "user_id" in session:
@@ -368,16 +379,15 @@ def dashboard():
 
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Fetch recent environment rows (if table exists)
+            # Recent sensor data
             try:
                 cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
                 raw = cur.fetchall()
-                # normalize for templates (date/time keys)
                 records = normalize_env_records(raw)
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'sensordata' does not exist.")
 
-            # Total chickens (if table exists)
+            # total chickens
             try:
                 cur.execute("SELECT COUNT(*) AS total FROM chickens")
                 res = cur.fetchone()
@@ -385,25 +395,21 @@ def dashboard():
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'chickens' does not exist.")
 
-            # Use most recent record for temperature/humidity if available
             if records:
                 temperature = records[0].get("temperature", 0) or 0
                 humidity = records[0].get("humidity", 0) or 0
 
-            # Next feeding (if table exists)
+            # upcoming feeding
             try:
                 cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
                 feed = cur.fetchone()
                 if feed and feed.get("feed_time"):
-                    # feed_time may be datetime object
                     ft = feed["feed_time"]
                     if isinstance(ft, datetime.datetime):
                         upcoming_feeding = ft.strftime("%H:%M")
                     else:
-                        # try parse
                         try:
-                            parsed = datetime.datetime.fromisoformat(str(ft))
-                            upcoming_feeding = parsed.strftime("%H:%M")
+                            upcoming_feeding = datetime.datetime.fromisoformat(str(ft)).strftime("%H:%M")
                         except Exception:
                             upcoming_feeding = str(ft)
             except psycopg.errors.UndefinedTable:
@@ -424,7 +430,6 @@ def dashboard():
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
 def admin_dashboard():
-    # Example admin metrics - try to load simple counts where possible
     active_users = 0
     reports_count = 0
     active_farms = 0
@@ -438,13 +443,15 @@ def admin_dashboard():
                 active_users = int(r["c"]) if r and r.get("c") is not None else 0
             except Exception:
                 app.logger.debug("admin_dashboard: users count failed")
-            # recent activity fallback: use sensordata or sensordata1 timestamps to show some activity
+
+            # build a tiny recent_activities fallback from sensordata
             try:
                 cur.execute("SELECT id, datetime FROM sensordata ORDER BY id DESC LIMIT 5")
                 rows = cur.fetchall()
                 for row in rows:
-                    dt = row.get("datetime") or row.get("timestamp") or ""
-                    recent_activities.append({"user":"system","action":"sensordata inserted","date": str(dt)})
+                    rec = dict(row)
+                    dt = rec.get("datetime") or rec.get("timestamp") or ""
+                    recent_activities.append({"user": "system", "action": "sensordata inserted", "date": str(dt)})
             except Exception:
                 app.logger.debug("admin_dashboard: recent activities fetch failed")
     except Exception:
@@ -568,43 +575,35 @@ def reset_with_token(token):
 @app.route("/growth-monitoring")
 @login_required
 def growth_monitoring():
-    # Some older templates used url_for('feeding_schedule') (BuildError). Provide alias route below.
-    return render_template("growth.html")
+    # Provide chart data from sensordata3
+    dates, weights = get_growth_chart_data(limit=50)
+    return render_template("growth.html", dates=dates, weights=weights)
 
-# --- Alias for older templates that reference feeding_schedule endpoint name ---
+# Backwards-compat alias (some older templates used url_for('feeding_schedule')).
 @app.route("/feeding_schedule")
 def feeding_schedule_alias():
-    """
-    Some templates (older) call url_for('feeding_schedule') — this alias keeps backward compatibility.
-    It delegates to the current feed_schedule view.
-    """
     return feed_schedule()
 
-# Keep your original feed-schedule route (templates use 'feed_schedule')
 @app.route("/feed-schedule")
 @login_required
 def feed_schedule():
     feeding_schedule = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("SELECT id, feed_time, feed_type, amount FROM feeding_schedule ORDER BY feed_time ASC")
-                raw = cur.fetchall()
-                # normalize feed_time to readable strings for templates
-                feeding_schedule = []
-                for r in raw:
-                    rec = dict(r)
-                    ft = rec.get("feed_time")
-                    if isinstance(ft, datetime.datetime):
-                        rec["time"] = ft.strftime("%Y-%m-%d %H:%M:%S")
-                    else:
-                        rec["time"] = str(ft)
-                    # compatibility with templates expecting .time, .feed_type, .amount
-                    rec["feed_type"] = rec.get("feed_type") or rec.get("type") or ""
-                    rec["amount"] = rec.get("amount") or 0
-                    feeding_schedule.append(rec)
-            except psycopg.errors.UndefinedTable:
-                app.logger.warning("Table 'feeding_schedule' does not exist.")
+            cur.execute("SELECT id, feed_time, feed_type, amount FROM feeding_schedule ORDER BY feed_time ASC")
+            raw = cur.fetchall()
+            for r in raw:
+                rec = dict(r)
+                ft = rec.get("feed_time")
+                if isinstance(ft, datetime.datetime):
+                    rec["time"] = ft.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    rec["time"] = str(ft)
+                rec["feed_type"] = rec.get("feed_type") or rec.get("type") or ""
+                rec["amount"] = rec.get("amount") or 0
+                feeding_schedule.append(rec)
+    except psycopg.errors.UndefinedTable:
+        app.logger.warning("Table 'feeding_schedule' does not exist.")
     except Exception:
         app.logger.exception("Failed to load feeding data")
         flash("Could not load feeding data.", "warning")
@@ -616,12 +615,11 @@ def environment():
     environment_data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 50")
-                raw = cur.fetchall()
-                environment_data = normalize_env_records(raw)
-            except psycopg.errors.UndefinedTable:
-                app.logger.warning("Table 'sensordata' does not exist.")
+            cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 50")
+            raw = cur.fetchall()
+            environment_data = normalize_env_records(raw)
+    except psycopg.errors.UndefinedTable:
+        app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
         app.logger.exception("Failed to load environment data")
         flash("Could not load environment data.", "warning")
@@ -643,12 +641,11 @@ def data_table():
     data_table_records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
-                raw = cur.fetchall()
-                data_table_records = normalize_env_records(raw)
-            except psycopg.errors.UndefinedTable:
-                app.logger.warning("Table 'sensordata' does not exist.")
+            cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
+            raw = cur.fetchall()
+            data_table_records = normalize_env_records(raw)
+    except psycopg.errors.UndefinedTable:
+        app.logger.warning("Table 'sensordata' does not exist.")
     except Exception:
         app.logger.exception("Failed to fetch data table")
         flash("Could not load data.", "warning")
@@ -658,5 +655,4 @@ def data_table():
 # Run App
 # -------------------------
 if __name__ == "__main__":
-    # Keep debug True for now (as in your original), but set to False in production if you want.
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=DEBUG)
