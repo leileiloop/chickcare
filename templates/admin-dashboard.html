@@ -1,99 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard | ChickCare</title>
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 
   <!-- Boxicons -->
-  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <!-- Flash messages -->
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="flash-messages">
-        {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
-
   <div class="container">
-    <!-- ================== Navigation ================= -->
+    <!-- ================= Navigation ================= -->
     <div class="navigation">
       <ul>
         <li>
           <a href="{{ url_for('dashboard') }}">
-            <span class="icon"><i class="bx bxs-chicken"></i></span>
+            <span class="icon"><i class='bx bxs-chicken'></i></span>
             <span class="title">ChickCare</span>
           </a>
         </li>
         <li class="active">
           <a href="{{ url_for('admin_dashboard') }}">
-            <span class="icon"><i class="bx bxs-dashboard"></i></span>
+            <span class="icon"><i class='bx bxs-dashboard'></i></span>
             <span class="title">Admin Dashboard</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('manage_users') }}">
-            <span class="icon"><i class="bx bx-user"></i></span>
+            <span class="icon"><i class='bx bx-user'></i></span>
             <span class="title">Manage Users</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('report') }}">
-            <span class="icon"><i class="bx bx-file"></i></span>
+            <span class="icon"><i class='bx bx-file'></i></span>
             <span class="title">Reports</span>
           </a>
         </li>
         <li>
           <a href="{{ url_for('logout') }}">
-            <span class="icon"><i class="bx bx-log-out"></i></span>
+            <span class="icon"><i class='bx bx-log-out'></i></span>
             <span class="title">Logout</span>
           </a>
         </li>
       </ul>
     </div>
 
-    <!-- ================= Main ================= -->
+    <!-- ================= Main Section ================= -->
     <div class="main">
       <!-- Topbar -->
       <div class="topbar">
-        <div class="toggle"><i class="bx bx-menu"></i></div>
-
-        <div class="title">Admin Control Panel</div>
-
+        <div class="toggle"><i class='bx bx-menu'></i></div>
+        <div class="search">
+          <input type="text" placeholder="Search user...">
+          <i class='bx bx-search'></i>
+        </div>
         <div class="user">
-          <!-- show username if available -->
-          <div class="username">{{ session.get('user_username', 'Admin') }}</div>
-          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar" onerror="this.style.display='none'"/>
+          <span class="username">{{ session.get('user_username', 'Admin') }}</span>
+          <img src="{{ url_for('static', filename='imgs/admin.jpg') }}" alt="Admin" onerror="this.style.display='none'">
         </div>
       </div>
 
-      <!-- Dashboard Cards -->
+      <!-- Dashboard Overview Cards -->
       <div class="cardBox">
         <div class="card">
           <div>
             <div class="numbers">{{ active_users | default(0) }}</div>
             <div class="cardName">Active Users</div>
           </div>
-          <div class="iconBx"><i class="bx bx-user"></i></div>
+          <div class="iconBx"><i class='bx bx-user'></i></div>
         </div>
 
         <div class="card">
           <div>
             <div class="numbers">{{ reports_count | default(0) }}</div>
-            <div class="cardName">Reports</div>
+            <div class="cardName">Total Reports</div>
           </div>
-          <div class="iconBx"><i class="bx bx-file"></i></div>
+          <div class="iconBx"><i class='bx bx-file'></i></div>
         </div>
 
         <div class="card">
@@ -101,7 +90,7 @@
             <div class="numbers">{{ active_farms | default(0) }}</div>
             <div class="cardName">Active Farms</div>
           </div>
-          <div class="iconBx"><i class="bx bx-home-smile"></i></div>
+          <div class="iconBx"><i class='bx bx-home-smile'></i></div>
         </div>
 
         <div class="card">
@@ -109,7 +98,7 @@
             <div class="numbers">{{ alerts_count | default(0) }}</div>
             <div class="cardName">Alerts</div>
           </div>
-          <div class="iconBx"><i class="bx bx-bell"></i></div>
+          <div class="iconBx"><i class='bx bx-bell'></i></div>
         </div>
       </div>
 
@@ -119,7 +108,6 @@
           <div class="cardHeader">
             <h2>Recent Activity</h2>
           </div>
-
           <table>
             <thead>
               <tr>
@@ -139,7 +127,40 @@
                 {% endfor %}
               {% else %}
                 <tr>
-                  <td colspan="3" style="text-align:center;">No recent activity found.</td>
+                  <td colspan="3" style="text-align:center;">No recent activity available.</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- System Logs -->
+      <div class="details">
+        <div class="recentOrders">
+          <div class="cardHeader">
+            <h2>System Logs</h2>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Log ID</th>
+                <th>Event</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if system_logs %}
+                {% for log in system_logs %}
+                <tr>
+                  <td>{{ log.id }}</td>
+                  <td>{{ log.event }}</td>
+                  <td>{{ log.date }}</td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="3" style="text-align:center;">No system logs available.</td>
                 </tr>
               {% endif %}
             </tbody>
@@ -149,19 +170,19 @@
     </div>
   </div>
 
-  <!-- JS -->
+  <!-- ================= Scripts ================= -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   <script>
-    // Sidebar toggle (defensive)
-    (function(){
-      const toggle = document.querySelector('.toggle');
-      const navigation = document.querySelector('.navigation');
-      const main = document.querySelector('.main');
-      if (!toggle || !navigation || !main) return;
-      toggle.addEventListener('click', () => {
+    // Sidebar toggle
+    const toggle = document.querySelector('.toggle');
+    const navigation = document.querySelector('.navigation');
+    const main = document.querySelector('.main');
+    if (toggle && navigation && main) {
+      toggle.onclick = () => {
         navigation.classList.toggle('active');
         main.classList.toggle('active');
-      });
-    })();
+      };
+    }
   </script>
 </body>
 </html>
