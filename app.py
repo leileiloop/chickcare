@@ -1,4 +1,3 @@
-
 # app.py (Combined Frontend/DB routes, uses Postgres Pool, AI/Hardware code removed)
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_mail import Mail, Message
@@ -469,6 +468,14 @@ def dashboard():
         upcoming_feeding=upcoming_feeding
     )
 
+# <-- FIX: Added route for main-dashboard.html
+@app.route("/main_dashboard")
+@login_required
+def main_dashboard():
+    # This is a basic route. You can add data-fetching logic here
+    # similar to your other dashboard routes if this page needs it.
+    return render_template("main-dashboard.html")
+
 @app.route("/admin-dashboard")
 @role_required("admin","superadmin")
 def admin_dashboard():
@@ -611,6 +618,7 @@ def reset_with_token(token):
     return render_template("reset_password.html", token=token)
 
 @app.route("/growth-monitoring")
+@app.route("/webcam") # <-- FIX: Alias for /webcam to render growth.html
 @login_required
 def growth_monitoring():
     dates, weights = get_growth_chart_data(limit=50)
@@ -621,6 +629,7 @@ def feeding_schedule_alias():
     return feed_schedule()
 
 @app.route("/feed-schedule")
+@app.route("/feeding") # <-- FIX: Alias for /feeding to render feeding.html
 @login_required
 def feed_schedule():
     feeding_schedule = []
@@ -754,8 +763,8 @@ def fetch_all_data4():
 
 @app.route('/get_all_data5')
 @app.route('/get_environment_data') # <-- FIXED: Alias for Environment
-@app.route('/get_all_data')        # <-- FIXED: Alias for general data
-@app.route('/data')                # <-- FIXED: Alias for report data
+@app.route('/get_all_data')       # <-- FIXED: Alias for general data
+@app.route('/data')               # <-- FIXED: Alias for report data
 def fetch_all_data5():
     """Fetches Environment data from sensordata."""
     try:
