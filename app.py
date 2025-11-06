@@ -362,15 +362,15 @@ def growth_monitoring():
 @app.route("/environment")
 @login_required
 def environment():
-    data = []
+    environment_data = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
-            data = cur.fetchall()
+            environment_data = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to load environment data")
         flash("Could not load environment data.", "warning")
-    return render_template("environment.html", data=data)
+    return render_template("environment.html", environment_data=environment_data)
 
 @app.route("/feed-schedule")
 @login_required
@@ -398,15 +398,15 @@ def report():
 @app.route("/data-table")
 @login_required
 def data_table():
-    data = []
+    data_table_records = []
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM sensordata ORDER BY id DESC")
-            data = cur.fetchall()
+            data_table_records = cur.fetchall()
     except Exception:
         app.logger.exception("Failed to fetch data table")
         flash("Could not load data.", "warning")
-    return render_template("data_table.html", data=data)
+    return render_template("data_table.html", data=data_table_records)
 
 # -------------------------
 # Run App
