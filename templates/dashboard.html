@@ -15,6 +15,18 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   <div class="container">
     <!-- ================== Navigation ================= -->
     <div class="navigation">
@@ -25,7 +37,7 @@
             <span class="title">ChickCare</span>
           </a>
         </li>
-        <li><a href="{{ url_for('dashboard') }}" class="active"><i class="bx bxs-dashboard"></i><span class="title">Dashboard</span></a></li>
+        <li class="active"><a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i><span class="title">Dashboard</span></a></li>
         <li><a href="{{ url_for('growth_monitoring') }}"><i class="bx bxs-bar-chart-square"></i><span class="title">Growth Tracking</span></a></li>
         <li><a href="{{ url_for('feed_schedule') }}"><i class="bx bxs-bowl-rice"></i><span class="title">Feeding Schedule</span></a></li>
         <li><a href="{{ url_for('environment') }}"><i class="bx bxs-thermometer"></i><span class="title">Environment</span></a></li>
@@ -38,17 +50,22 @@
       </ul>
     </div>
 
-    <!-- ================= Main Section ================= -->
+    <!-- ================== Main Section ================= -->
     <div class="main">
+
       <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class="bx bx-menu"></i></div>
+
         <div class="search">
           <input type="text" placeholder="Search..." />
           <i class="bx bx-search"></i>
         </div>
+
         <div class="user">
-          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar" />
+          <span class="username">{{ session.get('user_username', 'User') }}</span>
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User Avatar"
+               onerror="this.style.display='none';" />
         </div>
       </div>
 
@@ -56,7 +73,7 @@
       <div class="cardBox">
         <div class="card">
           <div>
-            <div class="numbers">{{ total_chickens or 0 }}</div>
+            <div class="numbers">{{ total_chickens | default(0) }}</div>
             <div class="cardName">Total Chickens</div>
           </div>
           <div class="iconBx"><i class="bx bxs-chicken"></i></div>
@@ -64,7 +81,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ temperature or 0 }} °C</div>
+            <div class="numbers">{{ temperature | default(0) }} °C</div>
             <div class="cardName">Temperature</div>
           </div>
           <div class="iconBx"><i class="bx bxs-thermometer"></i></div>
@@ -72,7 +89,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ humidity or 0 }} %</div>
+            <div class="numbers">{{ humidity | default(0) }} %</div>
             <div class="cardName">Humidity</div>
           </div>
           <div class="iconBx"><i class="bx bxs-droplet"></i></div>
@@ -80,7 +97,7 @@
 
         <div class="card">
           <div>
-            <div class="numbers">{{ upcoming_feeding or "N/A" }}</div>
+            <div class="numbers">{{ upcoming_feeding | default("N/A") }}</div>
             <div class="cardName">Next Feeding</div>
           </div>
           <div class="iconBx"><i class="bx bxs-time-five"></i></div>
@@ -100,7 +117,7 @@
               <tr>
                 <th>Date</th>
                 <th>Weight (g)</th>
-                <th>Temperature (°C)</th>
+                <th>Temp (°C)</th>
                 <th>Humidity (%)</th>
                 <th>Status</th>
               </tr>
@@ -109,11 +126,11 @@
               {% if records %}
                 {% for record in records %}
                 <tr>
-                  <td>{{ record['date'] }}</td>
-                  <td>{{ record['weight'] }}</td>
-                  <td>{{ record['temperature'] }}</td>
-                  <td>{{ record['humidity'] }}</td>
-                  <td><span class="status {{ record['status']|lower }}">{{ record['status'] }}</span></td>
+                  <td>{{ record.date }}</td>
+                  <td>{{ record.weight }}</td>
+                  <td>{{ record.temperature }}</td>
+                  <td>{{ record.humidity }}</td>
+                  <td><span class="status {{ record.status|lower }}">{{ record.status }}</span></td>
                 </tr>
                 {% endfor %}
               {% else %}
@@ -125,10 +142,21 @@
           </table>
         </div>
       </div>
+
     </div>
   </div>
 
-  <!-- JS -->
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <!-- Sidebar Toggle Script -->
+  <script>
+    const toggle = document.querySelector('.toggle');
+    const navigation = document.querySelector('.navigation');
+    const main = document.querySelector('.main');
+
+    toggle.addEventListener('click', () => {
+      navigation.classList.toggle('active');
+      main.classList.toggle('active');
+    });
+  </script>
+
 </body>
 </html>
