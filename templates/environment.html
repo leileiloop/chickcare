@@ -1,20 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Environment | ChickCare</title>
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
 
   <!-- Boxicons -->
-  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
 
-  <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
 
   <div class="container">
     <!-- ================== Navigation ================== -->
@@ -50,8 +61,8 @@
             <span class="title">Feeding Schedule</span>
           </a>
         </li>
-        <li>
-          <a href="{{ url_for('environment') }}" class="active">
+        <li class="active">
+          <a href="{{ url_for('environment') }}">
             <span class="icon"><i class='bx bxs-thermometer'></i></span>
             <span class="title">Environment</span>
           </a>
@@ -60,6 +71,20 @@
           <a href="{{ url_for('sanitization') }}">
             <span class="icon"><i class='bx bxs-virus'></i></span>
             <span class="title">Sanitization</span>
+          </a>
+        </li>
+        {% if session.get('user_role') in ['admin', 'superadmin'] %}
+        <li>
+          <a href="{{ url_for('manage_users') }}">
+            <span class="icon"><i class='bx bxs-user-account'></i></span>
+            <span class="title">Manage Users</span>
+          </a>
+        </li>
+        {% endif %}
+        <li>
+          <a href="{{ url_for('report') }}">
+            <span class="icon"><i class='bx bxs-file'></i></span>
+            <span class="title">Report</span>
           </a>
         </li>
         <li>
@@ -76,14 +101,10 @@
       <!-- Topbar -->
       <div class="topbar">
         <div class="toggle"><i class='bx bx-menu'></i></div>
-        <div class="search">
-          <label>
-            <input type="text" placeholder="Search here">
-            <i class='bx bx-search'></i>
-          </label>
-        </div>
+        <div class="title">Environment Monitoring</div>
         <div class="user">
-          <img src="{{ url_for('static', filename='img/user.jpg') }}" alt="User">
+          <img src="{{ url_for('static', filename='imgs/user.jpg') }}" alt="User"
+               onerror="this.style.display='none'">
         </div>
       </div>
 
@@ -91,7 +112,7 @@
       <div class="details">
         <div class="recentOrders">
           <div class="cardHeader">
-            <h2>Environment Monitoring</h2>
+            <h2>Real-Time Environment Data</h2>
           </div>
 
           <table>
@@ -107,15 +128,15 @@
               {% if environment_data %}
                 {% for record in environment_data %}
                 <tr>
-                  <td>{{ record.temperature }}</td>
-                  <td>{{ record.humidity }}</td>
-                  <td>{{ record.date }}</td>
-                  <td>{{ record.time }}</td>
+                  <td>{{ record.temperature | default('—') }}</td>
+                  <td>{{ record.humidity | default('—') }}</td>
+                  <td>{{ record.date | default('—') }}</td>
+                  <td>{{ record.time | default('—') }}</td>
                 </tr>
                 {% endfor %}
               {% else %}
                 <tr>
-                  <td colspan="4" style="text-align:center;">No environment data available</td>
+                  <td colspan="4" style="text-align:center;">No environment data available.</td>
                 </tr>
               {% endif %}
             </tbody>
@@ -125,7 +146,20 @@
     </div>
   </div>
 
-  <!-- Main JS -->
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <!-- JS -->
+  <script>
+    // Sidebar toggle
+    const toggle = document.querySelector('.toggle');
+    const navigation = document.querySelector('.navigation');
+    const main = document.querySelector('.main');
+
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        navigation.classList.toggle('active');
+        main.classList.toggle('active');
+      });
+    }
+  </script>
+
 </body>
 </html>
