@@ -57,8 +57,57 @@ app.config.update(
 # Database Helper
 # -------------------------
 def get_conn():
-    """Return a psycopg connection with dict row factory"""
     return psycopg.connect(DB_URL, row_factory=dict_row)
+
+# -------------------------
+# Auto Table Creation
+# -------------------------
+def init_tables():
+    """Create required tables if they don't exist"""
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            # Users table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL,
+                    email VARCHAR(150) UNIQUE NOT NULL,
+                    password VARCHAR(200) NOT NULL,
+                    role VARCHAR(50) DEFAULT 'user'
+                )
+            """)
+            # Sensor data table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sensordata (
+                    id SERIAL PRIMARY KEY,
+                    temperature FLOAT,
+                    humidity FLOAT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Chickens table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chickens (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100),
+                    age INT,
+                    weight FLOAT
+                )
+            """)
+            # Feeding schedule table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS feeding_schedule (
+                    id SERIAL PRIMARY KEY,
+                    feed_time TIMESTAMP,
+                    amount FLOAT
+                )
+            """)
+            conn.commit()
+        app.logger.info("All tables ensured.")
+    except Exception:
+        app.logger.exception("Failed to initialize tables")
+
+init_tables()
 
 # -------------------------
 # Decorators
@@ -143,7 +192,6 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-# ----- Auth -----
 @app.route("/login", methods=["GET","POST"])
 def login():
     if "user_id" in session:
@@ -207,17 +255,14 @@ def logout():
 @login_required
 def dashboard():
     records, total_chickens, temperature, humidity, upcoming_feeding = [], 0, 0, 0, "N/A"
-
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            # Recent sensor data
             try:
                 cur.execute("SELECT * FROM sensordata ORDER BY id DESC LIMIT 5")
                 records = cur.fetchall()
             except psycopg.errors.UndefinedTable:
                 app.logger.warning("Table 'sensordata' does not exist.")
 
-            # Total chickens
             try:
                 cur.execute("SELECT COUNT(*) AS total FROM chickens")
                 total_chickens = cur.fetchone()["total"]
@@ -228,7 +273,6 @@ def dashboard():
                 temperature = records[0].get("temperature", 0)
                 humidity = records[0].get("humidity", 0)
 
-            # Upcoming feeding
             try:
                 cur.execute("SELECT feed_time FROM feeding_schedule WHERE feed_time > NOW() ORDER BY feed_time ASC LIMIT 1")
                 feed = cur.fetchone()
