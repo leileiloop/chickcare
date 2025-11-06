@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Sanitization</title>
-<!-- ======= Styles ====== -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-    <!-- =============== Navigation ================ -->
     <div class="container">
         <div class="navigation">
             <ul>
@@ -75,7 +73,6 @@
                     </a>
                 </li>
 
-                <!-- Only show "Manage Users" if the logged-in user is an admin -->
                 {% if session['user_role'] == 'admin' %}
                 <li>
                     <a href="/manage_users">
@@ -97,17 +94,16 @@
                 </li>
 
                 <li>
-                    <a href="/login">
+                    <a href="{{ url_for('logout') }}">
                         <span class="icon">
-                            <a href="{{ url_for('logout') }}">
+                            <ion-icon name="log-out-outline"></ion-icon>
                         </span>
                         <span class="title">Sign Out</span>
                     </a>
                 </li>
-            </ul>
+                </ul>
         </div>
 
-        <!-- ========================= Main ==================== -->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -119,20 +115,20 @@
                 </div>
 
 
-		        <div class="iconn" onclick="toggleNotifi()">
-			    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
-		        </div>
-		        <div class="notifi-box" id="box">
-			        <h2>Notifications <span id="notificationCount1">0</span></h2>
-			    <div class="notifi-item">
+                <div class="iconn" onclick="toggleNotifi()">
+                    <img src="static/imgs/bell.png" alt=""> <span id="notificationCount">0</span>
+                </div>
+                <div class="notifi-box" id="box">
+                    <h2>Notifications <span id="notificationCount1">0</span></h2>
+                <div class="notifi-item">
 
-				    <div class="text" id="notificationItems">
+                    <div class="text" id="notificationItems">
 
-			        </div>
-			    </div>
+                    </div>
+                </div>
 
 
-		        </div>
+                </div>
 
 
                 <div class="user">
@@ -140,8 +136,7 @@
                 </div>
             </div>
 
-        <!-- ========================= Sanitization ==================== -->
-            <div class="status1">
+        <div class="status1">
                     <h1>Sanitization</h1>
                 <div class="cBox">
 
@@ -156,7 +151,6 @@
                         <img class="convy" src="/static/imgs/conveyor.png">
                     </div>
 
-                    <!-- Emergency Stop Button -->
                     <button id="stopConveyor" class="stop-btn">STOP</button>
 
                 </div>
@@ -171,7 +165,6 @@
                         <img class="sprink" src="/static/imgs/sprinkle.png">
                     </div>
 
-                    <!-- Emergency Stop Buttons -->
                     <button id="stopSprinkle" class="stop-btn">STOP</button>
 
                 </div>
@@ -189,48 +182,62 @@
                         <img class="uvcl" id="uvcImage" src="/static/imgs/UVCoff.png">
                     </div>
 
-                    <!-- Emergency Stop Buttons -->
                     <button id="stopUVLight" class="stop-btn">STOP</button>
 
                 </div>
 
                     <script>
-  function changeImage() {
-    const status = document.getElementById('status_uvc').innerText;  // Get the current status (ON or OFF)
-    const image = document.getElementById('uvcImage');  // Get the image element
-
-    if (status === 'ON') {
-      image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCon.png';  // Change to "ON" image
-    } else if (status === 'OFF') {
-      image.src = '/home/pi/Desktop/chicken/manginasal/static/imgs/UVCoff.png';  // Change to "OFF" image
-    }
-  }
-
-  // Call the function to set the image on page load
-  changeImage();
-
-</script>
-
-            </div>
+                        // 1. Select the elements we need to work with
+                        // Corrected ID to "uvc_status"
+                        const statusElement = document.getElementById('uvc_status');
+                        const imageElement = document.getElementById('uvcImage');
+                    
+                        // 2. Define the function that updates the image
+                        function updateUvcImage() {
+                            // Get the text and trim whitespace
+                            const status = statusElement.innerText.trim(); 
+                            
+                            if (status === 'ON') {
+                                // Corrected path to use url_for
+                                imageElement.src = '{{ url_for("static", filename="imgs/UVCon.png") }}';
+                            } else {
+                                // Default to OFF for 'OFF', empty, or any other state
+                                // Corrected path to use url_for
+                                imageElement.src = '{{ url_for("static", filename="imgs/UVCoff.png") }}';
+                            }
+                        }
+                    
+                        // 3. Create an observer to watch for changes
+                        const observer = new MutationObserver(function(mutations) {
+                            updateUvcImage();
+                        });
+                    
+                        // 4. Tell the observer to watch the status element for text changes
+                        observer.observe(statusElement, {
+                            childList: true, // This watches for changes to the text inside
+                        });
+                    
+                        // 5. Run the function once on page load just in case
+                        updateUvcImage();
+                    </script>
+                    </div>
 
             </div>
 
             <div id="table-body" class="SanitizationTable">
-                <!-- Data table -->
-            <table border="1">
-            <thead>
-                <tr>
-                    <th>DateTime</th>
-                    <th>Conveyor</th>
-                    <th>Sprinkle</th>
-                    <th>UVLight</th>
-                </tr>
-            </thead>
-            <tbody >
-            <!-- Table data will be dynamically loaded here -->
-            </tbody>
-            </table>
-        </div>
+                    <table border="1">
+                <thead>
+                    <tr>
+                        <th>DateTime</th>
+                        <th>Conveyor</th>
+                        <th>Sprinkle</th>
+                        <th>UVLight</th>
+                    </tr>
+                </thead>
+                <tbody >
+                </tbody>
+                </table>
+            </div>
 
         </div>
     </div>
@@ -240,10 +247,8 @@
 
 
 
-    <!-- ====== ionicons ======= -->
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script type(e"module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-    <!-- =========== Scripts =========  -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
 </html>
