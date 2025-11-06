@@ -206,11 +206,7 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    records = []
-    total_chickens = 0
-    temperature = 0
-    humidity = 0
-    upcoming_feeding = "N/A"
+    records, total_chickens, temperature, humidity, upcoming_feeding = [], 0, 0, 0, "N/A"
 
     try:
         with get_conn() as conn, conn.cursor() as cur:
